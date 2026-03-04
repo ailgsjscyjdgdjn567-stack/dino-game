@@ -3,63 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Ultimate Miner</title>
+    <title>3D Miner Physics</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #111; color: white; touch-action: none; }
         canvas { display: block; }
 
-        /* Экраны меню */
+        /* Интерфейс */
         #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
         .btn { padding: 15px 40px; margin: 10px; font-size: 18px; cursor: pointer; background: #34495e; color: white; border: 2px solid #ecf0f1; border-radius: 8px; min-width: 200px; }
-        .btn:hover { background: #2c3e50; }
-
-        /* Интерфейс игры */
+        
         #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; pointer-events: none; display: none; border: 1px solid #444; }
         .shop-area { pointer-events: auto; margin-top: 10px; }
         .shop-btn { background: #27ae60; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 5px; }
-        .shop-btn:disabled { background: #555; cursor: not-allowed; }
+
+        /* Сообщение о полной сумке */
+        #msg-full { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); color: #ff4757; font-weight: bold; font-size: 24px; display: none; text-shadow: 2px 2px 4px #000; pointer-events: none; }
 
         /* Мобильное управление */
         #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
-        .m-btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; user-select: none; border: 2px solid rgba(255,255,255,0.4); }
+        .m-btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; user-select: none; }
 
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; }
-        
-        .stat-val { color: #f1c40f; font-weight: bold; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 1px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1 id="title">3D ШАХТЕР</h1>
-    <div id="menu-main">
-        <button class="btn" onclick="chooseDevice()">ИГРАТЬ</button>
-        <button class="btn" onclick="resetSave()">СБРОСИТЬ ПРОГРЕСС</button>
-    </div>
-    <div id="menu-device" style="display:none">
-        <h2>Выберите устройство:</h2>
+    <h1>3D ШАХТЕР: ФИЗИКА</h1>
+    <div id="menu-device">
         <button class="btn" onclick="initGame('pc')">💻 КОМПЬЮТЕР</button>
         <button class="btn" onclick="initGame('mobile')">📱 ТЕЛЕФОН</button>
     </div>
 </div>
 
 <div id="ui">
-    <div>💰 Деньги: <span id="money" class="stat-val">0</span></div>
-    <div>🎒 Сумка: <span id="bag" class="stat-val">0</span> / <span id="maxBag">3</span></div>
-    <div>🛠️ Инструмент: <span id="tool-name" class="stat-val">Лопата</span></div>
+    <div>💰 Деньги: <span id="money" style="color:#f1c40f">0</span></div>
+    <div>🎒 Сумка: <span id="bag">0</span> / <span id="maxBag">3</span></div>
+    <div>🛠️: <span id="tool-name">Лопата</span></div>
     <div class="shop-area">
-        <button class="shop-btn" style="background:#2980b9" onclick="sellAll()">Продать ресурсы</button>
-        <button id="upgrade-btn" class="shop-btn" onclick="buyUpgrade()">Улучшить сумку ($200)</button>
-    </div>
-    <div id="pc-info" style="font-size: 11px; color: #aaa; margin-top: 10px;">
-        WASD - Ходить | 1, 2 - Инструмент | ЛКМ - Копать
+        <button class="shop-btn" onclick="sellAll()">Продать всё</button>
+        <button id="upgrade-btn" class="shop-btn" onclick="buyUpgrade()">Апгрейд ($200)</button>
     </div>
 </div>
 
+<div id="msg-full">СУМКА ПОЛНА!</div>
 <div id="crosshair"></div>
 
 <div id="mobile-controls">
-    <div class="m-btn" id="joystick">🕹️</div>
+    <div class="m-btn" id="m-up">⬆️</div>
     <div style="display:flex; gap:15px;">
         <div class="m-btn" onclick="toggleTool()">🔄</div>
         <div class="m-btn" id="dig-btn" style="background:rgba(231, 76, 60, 0.5)">⛏️</div>
@@ -70,48 +61,36 @@
     import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
     import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/PointerLockControls.js';
 
-    // --- ПЕРЕМЕННЫЕ СОСТОЯНИЯ ---
-    let state = {
-        money: parseInt(localStorage.getItem('min_money')) || 0,
-        bag: 0,
-        maxBag: parseInt(localStorage.getItem('min_maxBag')) || 3,
-        tool: 'shovel',
-        bagLevel: parseInt(localStorage.getItem('min_bagLvl')) || 1,
-        isMobile: false
-    };
+    let state = { money: 0, bag: 0, maxBag: 3, tool: 'shovel', bagLvl: 1, isMobile: false };
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let velocity = new THREE.Vector3();
+    let canJump = false;
 
-    // --- НАСТРОЙКА СЦЕНЫ ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb); // Небо
-    scene.fog = new THREE.Fog(0x87ceeb, 5, 15);
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 2, 18);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 5);
+    const light = new THREE.HemisphereLight(0xeeeeff, 0x444422, 1);
     scene.add(light);
-    scene.add(new THREE.AmbientLight(0x404040));
 
-    // --- МИР ---
+    // Мир
     const blocks = [];
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    
-    function generateWorld() {
-        for(let x = -4; x <= 4; x++) {
-            for(let z = -4; z <= 4; z++) {
-                for(let y = 0; y > -7; y--) {
-                    let type = 'dirt';
-                    let color = 0x6d4c41;
-                    if (y < -1) { type = 'stone'; color = 0x757575; }
-                    if (y < -2 && Math.random() > 0.9) { type = 'gold'; color = 0xffd700; }
-                    if (y < -4 && Math.random() > 0.95) { type = 'diamond'; color = 0x00e5ff; }
+    function createWorld() {
+        for(let x = -5; x <= 5; x++) {
+            for(let z = -5; z <= 5; z++) {
+                for(let y = 0; y > -10; y--) {
+                    let color = y === 0 ? 0x2ecc71 : (y > -3 ? 0x8b4513 : 0x7f8c8d);
+                    let type = y === 0 || y > -3 ? 'dirt' : 'stone';
+                    if(Math.random() > 0.95 && y < -2) { color = 0xf1c40f; type = 'gold'; }
 
-                    const material = new THREE.MeshStandardMaterial({ color: color });
-                    const cube = new THREE.Mesh(geometry, material);
+                    const mat = new THREE.MeshStandardMaterial({ color: color });
+                    const cube = new THREE.Mesh(geometry, mat);
                     cube.position.set(x, y, z);
                     cube.userData = { type: type };
                     scene.add(cube);
@@ -120,129 +99,146 @@
             }
         }
     }
-    generateWorld();
+    createWorld();
 
-    // --- УПРАВЛЕНИЕ ---
     const controls = new PointerLockControls(camera, document.body);
-
-    window.chooseDevice = () => {
-        document.getElementById('menu-main').style.display = 'none';
-        document.getElementById('menu-device').style.display = 'block';
-    };
 
     window.initGame = (mode) => {
         state.isMobile = (mode === 'mobile');
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('ui').style.display = 'block';
-        updateUI();
-
         if(!state.isMobile) {
             controls.lock();
             document.getElementById('crosshair').style.display = 'block';
         } else {
             document.getElementById('mobile-controls').style.display = 'flex';
-            document.getElementById('pc-info').style.display = 'none';
-            camera.position.set(0, 2, 4);
         }
     };
 
-    // --- ЛОГИКА ИГРЫ ---
-    const raycaster = new THREE.Raycaster();
+    // Движение (ПК)
+    const onKeyDown = (e) => {
+        if(e.code === 'KeyW') moveForward = true;
+        if(e.code === 'KeyS') moveBackward = true;
+        if(e.code === 'KeyA') moveLeft = true;
+        if(e.code === 'KeyD') moveRight = true;
+        if(e.code === 'Digit1') setTool('shovel');
+        if(e.code === 'Digit2') setTool('pickaxe');
+    };
+    const onKeyUp = (e) => {
+        if(e.code === 'KeyW') moveForward = false;
+        if(e.code === 'KeyS') moveBackward = false;
+        if(e.code === 'KeyA') moveLeft = false;
+        if(e.code === 'KeyD') moveRight = false;
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
 
+    // Мобильное движение (упрощенное)
+    document.getElementById('m-up').ontouchstart = () => moveForward = true;
+    document.getElementById('m-up').ontouchend = () => moveForward = false;
+
+    function setTool(t) {
+        state.tool = t;
+        document.getElementById('tool-name').innerText = t === 'shovel' ? 'Лопата' : 'Кирка';
+    }
+
+    window.toggleTool = () => setTool(state.tool === 'shovel' ? 'pickaxe' : 'shovel');
+
+    const raycaster = new THREE.Raycaster();
     function dig() {
         raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-        const intersects = raycaster.intersectObjects(blocks);
-
-        if(intersects.length > 0 && intersects[0].distance < 3.5) {
-            const obj = intersects[0].object;
-            const type = obj.userData.type;
-
+        const hits = raycaster.intersectObjects(blocks);
+        if(hits.length > 0 && hits[0].distance < 3) {
             if(state.bag >= state.maxBag) {
-                alert("Сумка полная!");
+                showFullMsg();
                 return;
             }
-
-            // Условие инструмента
-            const canDig = (type === 'dirt' && state.tool === 'shovel') || 
-                           (type !== 'dirt' && state.tool === 'pickaxe');
-
-            if(canDig) {
+            const obj = hits[0].object;
+            const type = obj.userData.type;
+            if((type === 'dirt' && state.tool === 'shovel') || (type !== 'dirt' && state.tool === 'pickaxe')) {
                 scene.remove(obj);
                 blocks.splice(blocks.indexOf(obj), 1);
                 state.bag++;
-                save();
                 updateUI();
             }
         }
     }
 
-    window.toggleTool = () => {
-        state.tool = (state.tool === 'shovel') ? 'pickaxe' : 'shovel';
-        updateUI();
-    };
+    function showFullMsg() {
+        const el = document.getElementById('msg-full');
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 1500);
+    }
 
-    window.sellAll = () => {
-        if(state.bag === 0) return;
-        state.money += state.bag * 50;
-        state.bag = 0;
-        save();
-        updateUI();
-    };
-
+    window.sellAll = () => { state.money += state.bag * 50; state.bag = 0; updateUI(); };
     window.buyUpgrade = () => {
-        let cost = state.bagLevel * 200;
-        if(state.money >= cost) {
-            state.money -= cost;
-            state.maxBag += 3;
-            state.bagLevel++;
-            save();
-            updateUI();
-        }
+        let cost = state.bagLvl * 200;
+        if(state.money >= cost) { state.money -= cost; state.maxBag += 3; state.bagLvl++; updateUI(); }
     };
 
     function updateUI() {
         document.getElementById('money').innerText = state.money;
         document.getElementById('bag').innerText = state.bag;
         document.getElementById('maxBag').innerText = state.maxBag;
-        document.getElementById('tool-name').innerText = (state.tool === 'shovel') ? 'Лопата' : 'Кирка';
-        document.getElementById('upgrade-btn').innerText = `Улучшить сумку ($${state.bagLevel * 200})`;
+        document.getElementById('upgrade-btn').innerText = `Апгрейд ($${state.bagLvl * 200})`;
     }
 
-    function save() {
-        localStorage.setItem('min_money', state.money);
-        localStorage.setItem('min_maxBag', state.maxBag);
-        localStorage.setItem('min_bagLvl', state.bagLevel);
-    }
-
-    window.resetSave = () => {
-        localStorage.clear();
-        location.reload();
-    };
-
-    // --- СЛУШАТЕЛИ ---
     document.addEventListener('mousedown', () => { if(controls.isLocked) dig(); });
-    document.getElementById('dig-btn').addEventListener('touchstart', (e) => { e.preventDefault(); dig(); });
-    
-    document.addEventListener('keydown', (e) => {
-        if(e.key === '1') { state.tool = 'shovel'; updateUI(); }
-        if(e.key === '2') { state.tool = 'pickaxe'; updateUI(); }
-    });
+    document.getElementById('dig-btn').ontouchstart = (e) => { e.preventDefault(); dig(); };
 
-    // Рендер цикл
+    // Физика и Рендер
+    let prevTime = performance.now();
     function animate() {
         requestAnimationFrame(animate);
+        const time = performance.now();
+        const delta = (time - prevTime) / 1000;
+
+        if (controls.isLocked || state.isMobile) {
+            // Гравитация
+            velocity.y -= 9.8 * delta; 
+
+            // Движение
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+
+            let direction = new THREE.Vector3();
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+
+            controls.moveRight(-velocity.x * delta);
+            controls.moveForward(-velocity.z * delta);
+            camera.position.y += (velocity.y * delta);
+
+            // Проверка коллизии с блоками (чтобы не падать сквозь пол)
+            let feetPos = camera.position.clone();
+            feetPos.y -= 1.5; // Смещение от камеры до ног
+            
+            let onGround = false;
+            for(let block of blocks) {
+                if(Math.abs(feetPos.x - block.position.x) < 0.6 && 
+                   Math.abs(feetPos.z - block.position.z) < 0.6 &&
+                   feetPos.y < block.position.y + 0.5 && feetPos.y > block.position.y - 0.5) {
+                    camera.position.y = block.position.y + 1.5;
+                    velocity.y = 0;
+                    onGround = true;
+                    break;
+                }
+            }
+            
+            // Если упал слишком глубоко (упал в бездну), возвращаем наверх
+            if(camera.position.y < -20) camera.position.set(0, 5, 0);
+        }
+
+        prevTime = time;
         renderer.render(scene, camera);
     }
-    
-    camera.position.y = 1.5;
+
+    camera.position.set(0, 2, 0);
     animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
 </script>
 </body>
 </html>
