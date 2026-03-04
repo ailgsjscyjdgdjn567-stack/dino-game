@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Survival: Bridge & Traffic Crash</title>
+    <title>Sky Survival: Bridge Chaos</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
@@ -16,13 +16,13 @@
 <body>
 
 <div id="ui">
-    ДИСТАНЦИЯ: <span id="dist">0</span> км | FPS: <span id="fps">0</span><br>
+    ДИСТАНЦИЯ: <span id="dist">0</span> км<br>
     ВЫСОТА: <span id="alt">0</span> м
 </div>
 
 <div id="disaster-ui">
     <button class="dis-btn" onclick="trigger('wing')">✂️ ОТРЫВ КРЫЛА</button>
-    <button class="dis-btn" onclick="trigger('alien')">🛸 НЛО</button>
+    <button class="dis-btn" onclick="trigger('engine')">💥 ВЗРЫВ ДВИГАТЕЛЯ</button>
 </div>
 
 <div id="death-log">
@@ -36,22 +36,30 @@ const ctx = canvas.getContext('2d');
 document.body.appendChild(canvas);
 
 let gameActive = true, worldX = 0, cameraX = 0;
-let plane = { x: 300, y: 300, angle: 0, speed: 8, broken: false, wingBroken: false, wingPart: null };
+let plane = { x: 300, y: 300, angle: 0, speed: 8, broken: false, wingBroken: false, engineExploded: false, wingPart: null };
 let buildings = [], clouds = [], debris = [], survivors = [], blood = [], cars = [], rivers = [];
 let names = ["Иван", "Мария", "Алекс", "Дмитрий", "Елена", "Петр", "Ольга", "Сергей"];
+let phrases = ["ПОМОГИТЕ!", "ГДЕ Я?", "МНЕ БОЛЬНО!", "КТО-НИБУДЬ!", "Я НЕ ХОЧУ УМИРАТЬ!", "ГДЕ МОЯ НОГА?", "ТУТ ЕСТЬ КТО?", "О НЕТ..."];
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.onresize = resize; resize();
 
-// Генерация мира
+// Генерация мира (умная расстановка: здания НЕ на реках)
 for(let i=0; i<15; i++) clouds.push({ x: Math.random()*20000, y: 50+Math.random()*200, w: 80+Math.random()*100 });
-for(let i=0; i<30; i++) buildings.push({ x: i * 3500 + 1000, w: 150, h: 200 + Math.random()*300 });
 for(let i=0; i<10; i++) rivers.push({ x: i * 7000 + 4000, w: 1200 });
 
-// Машины на мостах
+for(let i=0; i<100; i++) {
+    let bx = i * 800 + 1000;
+    // Проверка: не попадает ли здание на реку
+    let onRiver = rivers.some(r => bx > r.x - 200 && bx < r.x + r.w + 200);
+    if(!onRiver) {
+        buildings.push({ x: bx, w: 120, h: 150 + Math.random()*300 });
+    }
+}
+
 function spawnCars() {
     rivers.forEach(r => {
-        if(Math.random() > 0.98) cars.push({ x: r.x, y: canvas.height-125, speed: 2+Math.random()*3, color: 'red', broken: false });
+        if(Math.random() > 0.98) cars.push({ x: r.x, y: canvas.height-125, speed: 2+Math.random()*3, color: 'hsl('+Math.random()*360+', 70%, 50%)', broken: false });
     });
 }
 
@@ -62,6 +70,10 @@ function trigger(type) {
         plane.wingBroken = true; 
         plane.wingPart = { x: worldX + 300, y: plane.y, vx: 2, vy: 0, rot: 0 };
     }
+    if(type === 'engine') {
+        plane.engineExploded = true;
+        for(let i=0; i<10; i++) debris.push({ x: worldX+270, y: plane.y, vx: -5, vy: (Math.random()-0.5)*5, w: 5, h: 5, color: 'orange' });
+    }
 }
 
 function handleCrash(msg) {
@@ -69,15 +81,13 @@ function handleCrash(msg) {
     plane.broken = true;
     document.getElementById('death-log').style.display = 'block';
     
-    // Самолет на куски
-    for(let i=0; i<20; i++) debris.push({ x: worldX+300, y: plane.y, vx: (Math.random()-0.5)*20, vy: -10-Math.random()*10, w: 20, h: 10, rot: 0, rv: 0.1 });
+    for(let i=0; i<25; i++) debris.push({ x: worldX+300, y: plane.y, vx: (Math.random()-0.5)*20, vy: -10-Math.random()*10, w: 20, h: 10, rot: 0, rv: 0.1, color: Math.random()>0.5?'white':'gray' });
     
-    // Пассажиры
-    for(let i=0; i<5; i++) survivors.push({
-        name: names[i], x: worldX+300, y: plane.y, vx: (Math.random()-0.5)*15, vy: -15, 
-        color: 'yellow', health: 100, dead: false, grounded: false, chat: "О НЕТ!", timer: 0
+    for(let i=0; i<6; i++) survivors.push({
+        name: names[i % names.length], x: worldX+300, y: plane.y, vx: (Math.random()-0.5)*15, vy: -15, 
+        color: 'yellow', health: 100, dead: false, grounded: false, chat: phrases[Math.floor(Math.random()*phrases.length)], timer: 0
     });
-    setTimeout(() => location.reload(), 12000);
+    setTimeout(() => location.reload(), 15000);
 }
 
 function loop() {
@@ -86,99 +96,83 @@ function loop() {
         worldX += plane.speed;
         plane.y += ((plane.targetY || 300) - plane.y) * 0.05;
         cameraX = worldX - 300;
-        if(plane.wingBroken) { plane.y += 5; plane.angle = 0.2; }
+        if(plane.wingBroken || plane.engineExploded) { plane.y += 4; plane.speed *= 0.998; }
         spawnCars();
         
-        // Столкновения с машинами
         cars.forEach(c => {
             if(!c.broken && Math.abs((worldX+300)-c.x) < 50 && Math.abs(plane.y - c.y) < 30) {
                 c.broken = true;
-                for(let i=0; i<5; i++) debris.push({ x: c.x, y: c.y, vx: (Math.random()-0.5)*10, vy: -5, w: 10, h: 5, rot: 0, rv: 0.2, color: 'red' });
+                for(let i=0; i<8; i++) debris.push({ x: c.x, y: c.y, vx: (Math.random()-0.5)*15, vy: -10, w: 10, h: 5, rot: 0, rv: 0.3, color: c.color });
                 handleCrash("СТОЛКНОВЕНИЕ С МАШИНАМИ!");
             }
         });
-        
         if(plane.y > canvas.height-100) handleCrash("КРУШЕНИЕ!");
     }
 
-    // Фон и Небо
+    // Отрисовка мира
     ctx.fillStyle = "#1e3799"; ctx.fillRect(0,0,canvas.width, canvas.height);
-    clouds.forEach(c => { ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(c.x - cameraX*0.5, c.y, c.w, 0, Math.PI*2); ctx.fill(); });
+    clouds.forEach(c => { ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.beginPath(); ctx.arc(c.x - cameraX*0.5, c.y, c.w, 0, Math.PI*2); ctx.fill(); });
 
-    // Земля и реки
     ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
     rivers.forEach(r => {
         let rx = r.x - cameraX;
         ctx.fillStyle = "#3498db"; ctx.fillRect(rx, canvas.height-100, r.w, 100);
-        // Мост
-        ctx.fillStyle = "#7f8c8d"; ctx.fillRect(rx, canvas.height-130, r.w, 30);
-        for(let j=0; j<r.w; j+=100) { ctx.fillStyle="#333"; ctx.fillRect(rx+j, canvas.height-100, 20, 100); }
+        ctx.fillStyle = "#7f8c8d"; ctx.fillRect(rx, canvas.height-130, r.w, 30); // Мост
     });
 
-    // Аэропорт (взлетка)
-    for(let i=0; i<5; i++) {
-        let ax = i*10000 - cameraX;
-        ctx.fillStyle="#333"; ctx.fillRect(ax, canvas.height-105, 1200, 10);
-        ctx.fillStyle="white"; for(let j=0; j<1200; j+=100) ctx.fillRect(ax+j, canvas.height-100, 40, 5);
-    }
-
-    // Дома и фонари
     buildings.forEach(b => {
         let bx = b.x - cameraX;
         ctx.fillStyle = "#2f3640"; ctx.fillRect(bx, canvas.height-100-b.h, b.w, b.h);
-        ctx.fillStyle = "yellow"; ctx.beginPath(); ctx.arc(bx+b.w/2, canvas.height-100-b.h, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "yellow"; ctx.beginPath(); ctx.arc(bx+b.w/2, canvas.height-100-b.h, 4, 0, Math.PI*2); ctx.fill();
     });
 
-    // Машины
     cars.forEach(c => {
         if(!c.broken) c.x += c.speed;
         let cx = c.x - cameraX;
         ctx.fillStyle = c.color; ctx.fillRect(cx, c.y, 40, 20);
-        ctx.fillStyle = "black"; ctx.fillRect(cx+5, c.y+15, 10, 10); ctx.fillRect(cx+25, c.y+15, 10, 10);
     });
 
-    // Падающее крыло
     if(plane.wingPart) {
-        plane.wingPart.y += 5; plane.wingPart.rot += 0.1;
+        plane.wingPart.y += 6; plane.wingPart.rot += 0.12;
         ctx.save(); ctx.translate(plane.wingPart.x - cameraX, plane.wingPart.y); ctx.rotate(plane.wingPart.rot);
         ctx.fillStyle = "gray"; ctx.fillRect(-10, 0, 20, 40); ctx.restore();
     }
 
-    // Кровь
-    blood.forEach(p => { ctx.fillStyle = "red"; ctx.beginPath(); ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2); ctx.fill(); });
+    blood.forEach(p => { ctx.fillStyle = "rgba(200,0,0,0.7)"; ctx.beginPath(); ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2); ctx.fill(); });
 
-    // Обломки
     debris.forEach(d => {
         d.x += d.vx; d.y += d.vy; d.vy += 0.5; d.rot += d.rv;
-        if(d.y > canvas.height-100) { d.y = canvas.height-100; d.vx *= 0.8; }
+        if(d.y > canvas.height-100) { d.y = canvas.height-100; d.vx *= 0.7; d.vy *= -0.3; }
         ctx.save(); ctx.translate(d.x - cameraX, d.y); ctx.rotate(d.rot);
         ctx.fillStyle = d.color || "white"; ctx.fillRect(-d.w/2, -d.h/2, d.w, d.h); ctx.restore();
     });
 
-    // Пассажиры
     survivors.forEach(s => {
         if(!s.grounded) {
             s.x += s.vx; s.y += s.vy; s.vy += 0.5;
             if(s.y > canvas.height-100) { s.y = canvas.height-100; s.grounded = true; }
         } else if(!s.dead) {
-            s.health -= 0.1; s.timer++;
-            if(Math.random() > 0.8) blood.push({x: s.x, y: s.y, r: 2+Math.random()*3});
+            s.health -= 0.08; s.timer++;
+            if(Math.random() > 0.8) blood.push({x: s.x, y: s.y, r: 2+Math.random()*2});
             if(s.health <= 0) s.dead = true;
-            if(s.timer % 150 === 0) s.chat = ["ГДЕ ПОМОЩЬ?", "МНЕ БОЛЬНО!", "КТО ЖИВ?", "АААА!"][Math.floor(Math.random()*4)];
+            if(s.timer % 120 === 0) s.chat = phrases[Math.floor(Math.random()*phrases.length)];
         }
         let sx = s.x - cameraX;
-        ctx.fillStyle = s.dead ? "gray" : s.color; ctx.fillRect(sx-5, s.y-15, 10, 15);
-        ctx.fillStyle = "#ffdbac"; ctx.fillRect(sx-4, s.y-22, 8, 8);
-        if(!s.dead) {
-            ctx.fillStyle = "white"; ctx.font = "bold 10px Arial"; ctx.fillText(s.chat, sx-20, s.y-30);
+        ctx.fillStyle = s.dead ? "#333" : s.color; ctx.fillRect(sx-5, s.y-15, 10, 15);
+        ctx.fillStyle = "#ffdbac"; ctx.fillRect(sx-4, s.y-22, 8, 8); // Голова
+        if(!s.dead && s.grounded) {
+            ctx.fillStyle = "white"; ctx.font = "bold 11px monospace"; ctx.fillText(s.chat, sx-30, s.y-30);
         }
     });
 
-    // Живой самолет
     if(!plane.broken) {
         ctx.save(); ctx.translate(300, plane.y); ctx.rotate(plane.angle);
         ctx.fillStyle = "gray"; ctx.fillRect(-10, -35, 20, plane.wingBroken ? 35 : 70);
         ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill();
+        if(plane.engineExploded) {
+            ctx.fillStyle = "orange"; ctx.beginPath(); ctx.arc(-25, 0, 12 + Math.random()*5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(-25, 0, 5, 0, Math.PI*2); ctx.fill();
+        }
         ctx.restore();
     }
 
