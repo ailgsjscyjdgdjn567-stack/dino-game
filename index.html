@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Survival: Survivors & Blood Loss</title>
+    <title>Sky Survival: Real Crash Physics</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
         #ui { position: absolute; top: 10px; left: 10px; color: #0f0; background: rgba(0,0,0,0.8); padding: 12px; border: 1px solid #0f0; pointer-events: none; border-radius: 5px; font-family: monospace; z-index: 10; }
-        #death-log { position: absolute; top: 10px; right: 10px; color: #ff4d4d; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #ff4d4d; width: 200px; max-height: 80vh; overflow-y: auto; display: none; font-size: 12px; z-index: 100; }
-        #cabin-chatter { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%); color: #fff; text-shadow: 2px 2px #000; font-size: 20px; text-align: center; pointer-events: none; width: 90%; font-weight: bold; }
-        .dis-btn { position: absolute; top: 150px; right: 10px; background: #c0392b; color: white; border: 1px solid #eee; padding: 10px; cursor: pointer; border-radius: 4px; z-index: 20; }
+        #death-log { position: absolute; top: 10px; right: 10px; color: #ff4d4d; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #ff4d4d; width: 220px; max-height: 70vh; overflow-y: auto; display: none; font-size: 11px; z-index: 100; }
+        #disaster-ui { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .dis-btn { background: #c0392b; color: white; border: 2px solid #fff; padding: 10px; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        #cabin-chatter { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); color: #fff; text-shadow: 2px 2px #000; font-size: 20px; text-align: center; pointer-events: none; width: 90%; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    ДИСТАНЦИЯ: <span id="dist">0</span> км<br>
-    ВЫСОТА: <span id="alt">0</span> м<br>
-    FPS: <span id="fps">0</span>
+    ДИСТАНЦИЯ: <span id="dist">0</span> км | FPS: <span id="fps">0</span><br>
+    ВЫСОТА: <span id="alt">0</span> м
 </div>
 
 <div id="death-log">
@@ -26,7 +26,11 @@
     <div id="log-content"></div>
 </div>
 
-<button class="dis-btn" onclick="triggerCrash()">САМОЛИКВИДАЦИЯ</button>
+<div id="disaster-ui">
+    <button class="dis-btn" onclick="trigger('wing')">✂️ СЛОМАТЬ КРЫЛО</button>
+    <button class="dis-btn" onclick="trigger('alien')">🛸 ВЫЗВАТЬ НЛО</button>
+</div>
+
 <div id="cabin-chatter"></div>
 
 <script>
@@ -35,52 +39,65 @@ const ctx = canvas.getContext('2d');
 document.body.appendChild(canvas);
 const logBox = document.getElementById('death-log');
 const logContent = document.getElementById('log-content');
+const chatter = document.getElementById('cabin-chatter');
 
 let gameActive = true, worldX = 0, cameraX = 0;
-let plane = { x: 300, y: 300, angle: 0, speed: 8, broken: false, parts: [] };
-let survivors = [], buildings = [], bloodPuddles = [];
-let names = ["Иван", "Мария", "Алекс", "Дмитрий", "Елена", "Петр", "Ольга", "Сергей", "Анна", "Виктор", "Макс", "Кевин", "Лиза", "Сара"];
+let plane = { x: 300, y: 300, angle: 0, speed: 8, broken: false, wingBroken: false, engineOk: true };
+let buildings = [], clouds = [], debris = [], survivors = [], blood = [], ufo = {active: false};
+let names = ["Иван", "Мария", "Алекс", "Дмитрий", "Елена", "Петр", "Ольга", "Сергей", "Анна", "Виктор", "Кевин", "Лиза"];
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.onresize = resize; resize();
 
-// Генерация зданий
-for(let i=0; i<30; i++) buildings.push({ x: i * 2900 + 1500, w: 100 + Math.random()*100, h: 150 + Math.random()*350 });
+// Инициализация
+for(let i=0; i<20; i++) clouds.push({ x: Math.random()*10000, y: 50+Math.random()*200, w: 80+Math.random()*120 });
+for(let i=0; i<40; i++) buildings.push({ x: i * 2900 + 1500, w: 120+Math.random()*100, h: 150+Math.random()*350 });
 
-window.onmousemove = (e) => { if(!plane.broken) { plane.targetY = e.clientY; plane.targetX = e.clientX; } };
+window.onmousemove = (e) => { if(!plane.broken) plane.targetY = e.clientY; };
 
-function triggerCrash() { handleCrash("ОТКАЗ СИСТЕМ"); }
+function trigger(type) {
+    if(type === 'wing') { plane.wingBroken = true; say("ПРАВОЕ КРЫЛО ОТОРВАЛОСЬ!"); }
+    if(type === 'alien') { ufo = {active: true, x: worldX - 200, y: plane.y, state: 'hunting'}; say("НЛО ЗАМЕЧЕНО!"); }
+}
 
-function handleCrash(reason) {
+function say(txt) { chatter.innerText = txt; setTimeout(() => chatter.innerText="", 3000); }
+
+function handleCrash(msg) {
     if(plane.broken) return;
     plane.broken = true;
-    gameActive = false;
     logBox.style.display = 'block';
+    say(msg);
 
-    // Создание пассажиров
-    let passengerCount = 8 + Math.floor(Math.random() * 6);
-    for(let i = 0; i < passengerCount; i++) {
-        let isDeadImmediately = Math.random() > 0.6;
-        let survivor = {
-            name: names[Math.floor(Math.random()*names.length)] + " " + (i + 1),
-            x: worldX + plane.x + (Math.random()-0.5)*200,
-            y: canvas.height - 100,
-            color: `hsl(${Math.random()*360}, 70%, 50%)`,
-            dead: isDeadImmediately,
-            health: isDeadImmediately ? 0 : (20 + Math.random()*80),
-            bleeding: Math.random() > 0.3,
-            screamTimer: Math.random() * 100
-        };
-        survivors.push(survivor);
-        updateLog();
+    // Разрушение самолета на куски
+    for(let i=0; i<25; i++) {
+        debris.push({
+            x: worldX + plane.x, y: plane.y,
+            vx: (Math.random()-0.5)*25, vy: (Math.random()-0.5)*20 - 5,
+            w: 10+Math.random()*30, h: 5+Math.random()*15,
+            rot: Math.random()*Math.PI, rv: (Math.random()-0.5)*0.2,
+            color: Math.random() > 0.3 ? "white" : "gray"
+        });
     }
+
+    // Разлет людей
+    let count = 6 + Math.floor(Math.random()*6);
+    for(let i=0; i<count; i++) {
+        survivors.push({
+            name: names[i % names.length] + " " + (i+1),
+            x: worldX + plane.x, y: plane.y,
+            vx: (Math.random()-0.5)*15, vy: -10 - Math.random()*15,
+            color: `hsl(${Math.random()*360}, 70%, 50%)`,
+            health: 100, dead: false, bleeding: Math.random() > 0.4,
+            grounded: false, screamTimer: 0
+        });
+    }
+    updateLog();
+    setTimeout(() => location.reload(), 10000);
 }
 
 function updateLog() {
     logContent.innerHTML = survivors.map(s => 
-        `<div style="color:${s.dead ? '#ff4d4d' : '#4dff4d'}">
-            ${s.dead ? '💀' : '👤'} ${s.name} - ${s.dead ? 'МЕРТВ' : 'РАНЕН ('+Math.floor(s.health)+'%)'}
-        </div>`
+        `<div style="color:${s.dead ? '#ff4d4d' : '#4dff4d'}">${s.dead ? '💀' : '👤'} ${s.name} - ${s.dead ? 'МЕРТВ' : 'ЖИВ ('+Math.floor(s.health)+'%)'}</div>`
     ).join('');
 }
 
@@ -89,88 +106,100 @@ function loop() {
     
     if(!plane.broken) {
         worldX += plane.speed;
-        let dy = (plane.targetY || 300) - plane.y;
-        plane.y += dy * 0.05;
+        plane.y += ((plane.targetY || 300) - plane.y) * 0.05;
         cameraX = worldX - 200;
+        if(plane.wingBroken) plane.y += 3;
+        
+        // НЛО
+        if(ufo.active) {
+            ufo.x += (worldX + 150 - ufo.x) * 0.05;
+            ufo.y += (plane.y - ufo.y) * 0.05;
+            if(Math.abs(ufo.x - (worldX+150)) < 50) {
+                plane.engineOk = false;
+                ctx.strokeStyle = "lime"; ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.moveTo(ufo.x - cameraX, ufo.y); ctx.lineTo(300, plane.y); ctx.stroke();
+            }
+        }
 
-        // Проверка столкновения со зданиями
+        // Проверка столкновений
         buildings.forEach(b => {
-            let bx = b.x - cameraX;
-            if(bx > 250 && bx < 350 && plane.y > canvas.height - 100 - b.h) handleCrash("СТОЛКНОВЕНИЕ");
+            if(worldX+300 > b.x && worldX+300 < b.x+b.w && plane.y > canvas.height-100-b.h) handleCrash("СТОЛКНОВЕНИЕ!");
         });
+        if(plane.y > canvas.height - 100) handleCrash("КРУШЕНИЕ!");
     }
 
-    // Рисуем небо
-    ctx.fillStyle = "#1a1a2e"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    // РИСОВАНИЕ
+    ctx.fillStyle = "#1e3799"; ctx.fillRect(0,0,canvas.width, canvas.height); // Небо
     
-    // Рисуем землю
-    ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    // Облака
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    clouds.forEach(c => ctx.beginPath() && ctx.arc(c.x - cameraX*0.5, c.y, c.w, 0, Math.PI*2) && ctx.fill());
 
-    // Здания
+    // Земля
+    ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+
+    // Дома и фонари
     buildings.forEach(b => {
         let bx = b.x - cameraX;
-        if(bx > -200 && bx < canvas.width + 200) {
-            ctx.fillStyle = "#34495e"; ctx.fillRect(bx, canvas.height - 100 - b.h, b.w, b.h);
-        }
+        ctx.fillStyle = "#2f3640"; ctx.fillRect(bx, canvas.height-100-b.h, b.w, b.h);
+        // Фонари на крыше
+        ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(bx + b.w/2, canvas.height-100-b.h, 5, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 15; ctx.shadowColor = "yellow"; ctx.fill(); ctx.shadowBlur = 0;
     });
 
-    // Кровь на земле
-    bloodPuddles.forEach(p => {
-        ctx.fillStyle = "rgba(200, 0, 0, 0.6)";
-        ctx.beginPath(); ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2); ctx.fill();
+    // Кровь
+    ctx.fillStyle = "red";
+    blood.forEach(p => ctx.beginPath() && ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2) && ctx.fill());
+
+    // Обломки самолета
+    debris.forEach(d => {
+        d.x += d.vx; d.y += d.vy; d.vy += 0.5; d.rot += d.rv;
+        if(d.y > canvas.height-100) { d.y = canvas.height-100; d.vx *= 0.5; d.vy = 0; }
+        ctx.save(); ctx.translate(d.x - cameraX, d.y); ctx.rotate(d.rot);
+        ctx.fillStyle = d.color; ctx.fillRect(-d.w/2, -d.h/2, d.w, d.h); ctx.restore();
     });
 
-    // Пассажиры
+    // Люди
     survivors.forEach(s => {
-        let sx = s.x - cameraX;
-        if(sx > -50 && sx < canvas.width + 50) {
-            // Тело
-            ctx.fillStyle = s.color;
-            ctx.fillRect(sx - 5, s.y - 15, 10, 15);
-            // Голова
-            ctx.fillStyle = "#ffdbac";
-            ctx.fillRect(sx - 4, s.y - 22, 8, 8);
-            // Глаза
-            ctx.fillStyle = "white";
-            ctx.fillRect(sx - 3, s.y - 20, 2, 2); ctx.fillRect(sx + 1, s.y - 20, 2, 2);
-            ctx.fillStyle = "black";
-            ctx.fillRect(sx - 2, s.y - 19, 1, 1); ctx.fillRect(sx + 2, s.y - 19, 1, 1);
+        if(!s.grounded) {
+            s.x += s.vx; s.y += s.vy; s.vy += 0.5;
+            if(s.y > canvas.height-100) { s.y = canvas.height-100; s.grounded = true; }
+        } else if(!s.dead && s.bleeding) {
+            s.health -= 0.1;
+            if(Math.random() > 0.9) blood.push({x: s.x, y: s.y, r: 2+Math.random()*3});
+            if(s.health <= 0) { s.dead = true; updateLog(); }
+        }
 
-            if(!s.dead) {
-                // Логика потери крови
-                if(s.bleeding) {
-                    s.health -= 0.05;
-                    if(Math.random() > 0.98) bloodPuddles.push({x: s.x, y: s.y - 2, r: 2 + Math.random()*3});
-                    if(s.health <= 0) { s.dead = true; updateLog(); }
-                }
-                // Крики
-                s.screamTimer++;
-                if(s.screamTimer > 100) {
-                    ctx.fillStyle = "white"; ctx.font = "10px Arial";
-                    ctx.fillText(s.bleeding ? "ПОМОГИТЕ! КРОВЬ!" : "КТО-НИБУДЬ!", sx - 20, s.y - 30);
-                    if(s.screamTimer > 150) s.screamTimer = 0;
-                }
-            } else {
-                // Труп (лежит)
-                ctx.save();
-                ctx.translate(sx, s.y); ctx.rotate(Math.PI/2);
-                ctx.fillStyle = s.color; ctx.fillRect(0, -5, 15, 10);
-                ctx.restore();
+        let sx = s.x - cameraX;
+        // Тело
+        ctx.fillStyle = s.color; ctx.fillRect(sx-5, s.y-(s.dead?5:15), 10, s.dead?5:15);
+        // Голова и Глаза
+        ctx.fillStyle = "#ffdbac"; ctx.fillRect(sx-4, s.y-(s.dead?8:22), 8, 8);
+        ctx.fillStyle = "white"; ctx.fillRect(sx-3, s.y-(s.dead?6:20), 2, 2); ctx.fillRect(sx+1, s.y-(s.dead?6:20), 2, 2);
+        
+        if(!s.dead && s.grounded) {
+            s.screamTimer++;
+            if(s.screamTimer % 100 < 50) {
+                ctx.fillStyle = "white"; ctx.font = "bold 12px Arial";
+                ctx.fillText("ПОМОГИТЕ!", sx-30, s.y-30);
             }
         }
     });
 
-    // Самолет
+    // Самолет (живой)
     if(!plane.broken) {
-        ctx.fillStyle = "white";
-        ctx.fillRect(plane.x - 40, plane.y - 10, 80, 20);
+        ctx.save(); ctx.translate(300, plane.y);
+        ctx.fillStyle = "gray"; ctx.fillRect(-10, -35, 20, 70); // Крылья
+        if(plane.wingBroken) { ctx.fillStyle = "black"; ctx.fillRect(0, 0, 15, 35); } // След отлома
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill(); // Корпус
+        if(!plane.engineOk) { ctx.fillStyle = "orange"; ctx.beginPath(); ctx.arc(-30, 0, 10, 0, Math.PI*2); ctx.fill(); }
+        ctx.restore();
     }
 
     document.getElementById('dist').innerText = Math.floor(worldX/100);
-    document.getElementById('alt').innerText = Math.floor(canvas.height - 100 - plane.y);
+    document.getElementById('alt').innerText = Math.max(0, Math.floor(canvas.height-100-plane.y));
     requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 </body>
