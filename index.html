@@ -1,293 +1,248 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Dino Galaxy Ultimate</title>
-<style>
-body{margin:0;overflow:hidden;background:black;font-family:Arial;color:white}
-canvas{display:block;margin:auto;background:#111}
-.menu{
-position:absolute;top:50%;left:50%;
-transform:translate(-50%,-50%);
-background:#1a1a1a;padding:30px;border-radius:20px;
-text-align:center;z-index:10;
-}
-button{
-padding:10px 20px;
-margin:8px;
-border:none;
-border-radius:10px;
-background:#333;
-color:white;
-cursor:pointer;
-font-size:16px;
-}
-#ui{
-position:absolute;
-top:10px;
-left:10px;
-font-size:18px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Ultimate Miner</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #111; color: white; touch-action: none; }
+        canvas { display: block; }
+
+        /* Экраны меню */
+        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
+        .btn { padding: 15px 40px; margin: 10px; font-size: 18px; cursor: pointer; background: #34495e; color: white; border: 2px solid #ecf0f1; border-radius: 8px; min-width: 200px; }
+        .btn:hover { background: #2c3e50; }
+
+        /* Интерфейс игры */
+        #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; pointer-events: none; display: none; border: 1px solid #444; }
+        .shop-area { pointer-events: auto; margin-top: 10px; }
+        .shop-btn { background: #27ae60; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 5px; }
+        .shop-btn:disabled { background: #555; cursor: not-allowed; }
+
+        /* Мобильное управление */
+        #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
+        .m-btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; user-select: none; border: 2px solid rgba(255,255,255,0.4); }
+
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; }
+        
+        .stat-val { color: #f1c40f; font-weight: bold; }
+    </style>
 </head>
 <body>
 
-<div id="mainMenu" class="menu">
-<h1>🐲 DINO GALAXY</h1>
-<p>Выберите устройство</p>
-<button onclick="setDevice('pc')">ПК</button>
-<button onclick="setDevice('mobile')">Телефон</button>
-<button onclick="setDevice('tablet')">Планшет</button>
+<div id="overlay">
+    <h1 id="title">3D ШАХТЕР</h1>
+    <div id="menu-main">
+        <button class="btn" onclick="chooseDevice()">ИГРАТЬ</button>
+        <button class="btn" onclick="resetSave()">СБРОСИТЬ ПРОГРЕСС</button>
+    </div>
+    <div id="menu-device" style="display:none">
+        <h2>Выберите устройство:</h2>
+        <button class="btn" onclick="initGame('pc')">💻 КОМПЬЮТЕР</button>
+        <button class="btn" onclick="initGame('mobile')">📱 ТЕЛЕФОН</button>
+    </div>
 </div>
 
-<div id="shop" class="menu" style="display:none;"></div>
-<div id="ui"></div>
+<div id="ui">
+    <div>💰 Деньги: <span id="money" class="stat-val">0</span></div>
+    <div>🎒 Сумка: <span id="bag" class="stat-val">0</span> / <span id="maxBag">3</span></div>
+    <div>🛠️ Инструмент: <span id="tool-name" class="stat-val">Лопата</span></div>
+    <div class="shop-area">
+        <button class="shop-btn" style="background:#2980b9" onclick="sellAll()">Продать ресурсы</button>
+        <button id="upgrade-btn" class="shop-btn" onclick="buyUpgrade()">Улучшить сумку ($200)</button>
+    </div>
+    <div id="pc-info" style="font-size: 11px; color: #aaa; margin-top: 10px;">
+        WASD - Ходить | 1, 2 - Инструмент | ЛКМ - Копать
+    </div>
+</div>
 
-<canvas id="game" width="1000" height="500" style="display:none;"></canvas>
+<div id="crosshair"></div>
 
-<script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
+<div id="mobile-controls">
+    <div class="m-btn" id="joystick">🕹️</div>
+    <div style="display:flex; gap:15px;">
+        <div class="m-btn" onclick="toggleTool()">🔄</div>
+        <div class="m-btn" id="dig-btn" style="background:rgba(231, 76, 60, 0.5)">⛏️</div>
+    </div>
+</div>
 
-let device="pc";
-let gameRunning=false;
-let paused=false;
+<script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
+    import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/PointerLockControls.js';
 
-let player={x:150,y:380,vy:0,hp:20};
-let gravity=1;
+    // --- ПЕРЕМЕННЫЕ СОСТОЯНИЯ ---
+    let state = {
+        money: parseInt(localStorage.getItem('min_money')) || 0,
+        bag: 0,
+        maxBag: parseInt(localStorage.getItem('min_maxBag')) || 3,
+        tool: 'shovel',
+        bagLevel: parseInt(localStorage.getItem('min_bagLvl')) || 1,
+        isMobile: false
+    };
 
-let zombies=[];
-let bullets=[];
-let boss=null;
+    // --- НАСТРОЙКА СЦЕНЫ ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // Небо
+    scene.fog = new THREE.Fog(0x87ceeb, 5, 15);
 
-let coins=0;
-let wave=1;
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
 
-let spawnInterval=null;
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
 
-/* DEVICE SELECT */
-function setDevice(type){
-device=type;
-document.getElementById("mainMenu").style.display="none";
-canvas.style.display="block";
-startGame();
-}
+    // --- МИР ---
+    const blocks = [];
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    
+    function generateWorld() {
+        for(let x = -4; x <= 4; x++) {
+            for(let z = -4; z <= 4; z++) {
+                for(let y = 0; y > -7; y--) {
+                    let type = 'dirt';
+                    let color = 0x6d4c41;
+                    if (y < -1) { type = 'stone'; color = 0x757575; }
+                    if (y < -2 && Math.random() > 0.9) { type = 'gold'; color = 0xffd700; }
+                    if (y < -4 && Math.random() > 0.95) { type = 'diamond'; color = 0x00e5ff; }
 
-/* START GAME */
-function startGame(){
-gameRunning=true;
-spawnInterval=setInterval(spawnZombies,5000);
-update();
-}
+                    const material = new THREE.MeshStandardMaterial({ color: color });
+                    const cube = new THREE.Mesh(geometry, material);
+                    cube.position.set(x, y, z);
+                    cube.userData = { type: type };
+                    scene.add(cube);
+                    blocks.push(cube);
+                }
+            }
+        }
+    }
+    generateWorld();
 
-/* SPAWN 3 ZOMBIES EVERY 5 SEC */
-function spawnZombies(){
-if(!gameRunning)return;
+    // --- УПРАВЛЕНИЕ ---
+    const controls = new PointerLockControls(camera, document.body);
 
-for(let i=0;i<3;i++){
-zombies.push(createZombie());
-}
+    window.chooseDevice = () => {
+        document.getElementById('menu-main').style.display = 'none';
+        document.getElementById('menu-device').style.display = 'block';
+    };
 
-if(wave%5===0 && !boss){
-boss=createBoss();
-}
+    window.initGame = (mode) => {
+        state.isMobile = (mode === 'mobile');
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
+        updateUI();
 
-wave++;
-}
+        if(!state.isMobile) {
+            controls.lock();
+            document.getElementById('crosshair').style.display = 'block';
+        } else {
+            document.getElementById('mobile-controls').style.display = 'flex';
+            document.getElementById('pc-info').style.display = 'none';
+            camera.position.set(0, 2, 4);
+        }
+    };
 
-/* CREATE ZOMBIE */
-function createZombie(){
-return{
-x:1000,
-y:380,
-hp:9,
-frame:0,
-dead:false,
-deathFrame:0
-};
-}
+    // --- ЛОГИКА ИГРЫ ---
+    const raycaster = new THREE.Raycaster();
 
-/* CREATE BOSS DRAGON */
-function createBoss(){
-return{
-x:1000,
-y:300,
-hp:29,
-frame:0,
-dead:false,
-deathFrame:0
-};
-}
+    function dig() {
+        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+        const intersects = raycaster.intersectObjects(blocks);
 
-/* CONTROLS */
-document.addEventListener("keydown",e=>{
-if(device==="pc"){
-if(e.code==="Space")player.vy=-18;
-if(e.key==="f")shoot();
-if(e.key==="b")openShop();
-}
-});
+        if(intersects.length > 0 && intersects[0].distance < 3.5) {
+            const obj = intersects[0].object;
+            const type = obj.userData.type;
 
-canvas.addEventListener("click",()=>{
-if(device!=="pc")shoot();
-});
+            if(state.bag >= state.maxBag) {
+                alert("Сумка полная!");
+                return;
+            }
 
-function shoot(){
-bullets.push({x:player.x+60,y:player.y+20});
-}
+            // Условие инструмента
+            const canDig = (type === 'dirt' && state.tool === 'shovel') || 
+                           (type !== 'dirt' && state.tool === 'pickaxe');
 
-/* SHOP */
-function openShop(){
-paused=true;
-document.getElementById("shop").style.display="block";
-document.getElementById("shop").innerHTML=`
-<h2>МАГАЗИН</h2>
-<p>Монеты: ${coins}</p>
-<button onclick="closeShop()">Закрыть</button>
-`;
-}
+            if(canDig) {
+                scene.remove(obj);
+                blocks.splice(blocks.indexOf(obj), 1);
+                state.bag++;
+                save();
+                updateUI();
+            }
+        }
+    }
 
-function closeShop(){
-paused=false;
-document.getElementById("shop").style.display="none";
-update();
-}
+    window.toggleTool = () => {
+        state.tool = (state.tool === 'shovel') ? 'pickaxe' : 'shovel';
+        updateUI();
+    };
 
-/* DRAW PLAYER DRAGON */
-function drawPlayer(){
-ctx.fillStyle="green";
-ctx.fillRect(player.x,player.y,70,50);
+    window.sellAll = () => {
+        if(state.bag === 0) return;
+        state.money += state.bag * 50;
+        state.bag = 0;
+        save();
+        updateUI();
+    };
 
-/* глаз */
-ctx.fillStyle="white";
-ctx.fillRect(player.x+50,player.y+10,10,10);
-ctx.fillStyle="black";
-ctx.fillRect(player.x+55,player.y+13,5,5);
+    window.buyUpgrade = () => {
+        let cost = state.bagLevel * 200;
+        if(state.money >= cost) {
+            state.money -= cost;
+            state.maxBag += 3;
+            state.bagLevel++;
+            save();
+            updateUI();
+        }
+    };
 
-/* ноги анимация */
-let legOffset=Math.sin(Date.now()/100)*5;
-ctx.fillStyle="darkgreen";
-ctx.fillRect(player.x+10,player.y+50,10,20+legOffset);
-ctx.fillRect(player.x+40,player.y+50,10,20-legOffset);
+    function updateUI() {
+        document.getElementById('money').innerText = state.money;
+        document.getElementById('bag').innerText = state.bag;
+        document.getElementById('maxBag').innerText = state.maxBag;
+        document.getElementById('tool-name').innerText = (state.tool === 'shovel') ? 'Лопата' : 'Кирка';
+        document.getElementById('upgrade-btn').innerText = `Улучшить сумку ($${state.bagLevel * 200})`;
+    }
 
-/* рука */
-ctx.fillRect(player.x+65,player.y+20,15,10);
-}
+    function save() {
+        localStorage.setItem('min_money', state.money);
+        localStorage.setItem('min_maxBag', state.maxBag);
+        localStorage.setItem('min_bagLvl', state.bagLevel);
+    }
 
-/* DRAW ZOMBIE */
-function drawZombie(z){
-if(z.dead){
-ctx.fillStyle="red";
-ctx.globalAlpha=1-(z.deathFrame/30);
-ctx.fillRect(z.x,z.y,40,40);
-ctx.globalAlpha=1;
-z.deathFrame++;
-return;
-}
+    window.resetSave = () => {
+        localStorage.clear();
+        location.reload();
+    };
 
-ctx.fillStyle="green";
-ctx.fillRect(z.x,z.y,40,40);
+    // --- СЛУШАТЕЛИ ---
+    document.addEventListener('mousedown', () => { if(controls.isLocked) dig(); });
+    document.getElementById('dig-btn').addEventListener('touchstart', (e) => { e.preventDefault(); dig(); });
+    
+    document.addEventListener('keydown', (e) => {
+        if(e.key === '1') { state.tool = 'shovel'; updateUI(); }
+        if(e.key === '2') { state.tool = 'pickaxe'; updateUI(); }
+    });
 
-/* глаза */
-ctx.fillStyle="white";
-ctx.fillRect(z.x+5,z.y+10,8,8);
-ctx.fillRect(z.x+20,z.y+10,8,8);
+    // Рендер цикл
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+    
+    camera.position.y = 1.5;
+    animate();
 
-/* рот */
-ctx.fillStyle="black";
-ctx.fillRect(z.x+10,z.y+25,15,5);
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
-/* ноги бег */
-let leg=Math.sin(Date.now()/150)*5;
-ctx.fillRect(z.x+5,z.y+40,8,20+leg);
-ctx.fillRect(z.x+25,z.y+40,8,20-leg);
-
-/* руки */
-ctx.fillRect(z.x-5,z.y+15,10,8);
-ctx.fillRect(z.x+35,z.y+15,10,8);
-}
-
-/* DRAW BOSS */
-function drawBoss(b){
-if(b.dead){
-ctx.fillStyle="orange";
-ctx.globalAlpha=1-(b.deathFrame/60);
-ctx.fillRect(b.x,b.y,80,80);
-ctx.globalAlpha=1;
-b.deathFrame++;
-return;
-}
-
-ctx.fillStyle="purple";
-ctx.fillRect(b.x,b.y,80,80);
-
-/* глаза */
-ctx.fillStyle="red";
-ctx.fillRect(b.x+20,b.y+20,15,15);
-ctx.fillRect(b.x+50,b.y+20,15,15);
-
-/* крылья */
-ctx.fillStyle="darkred";
-ctx.fillRect(b.x-30,b.y+10,30,40);
-ctx.fillRect(b.x+80,b.y+10,30,40);
-
-/* ноги */
-let leg=Math.sin(Date.now()/120)*8;
-ctx.fillRect(b.x+15,b.y+80,15,30+leg);
-ctx.fillRect(b.x+50,b.y+80,15,30-leg);
-}
-
-/* UPDATE LOOP */
-function update(){
-if(!gameRunning||paused)return;
-
-ctx.clearRect(0,0,1000,500);
-
-/* physics */
-player.vy+=gravity;
-player.y+=player.vy;
-if(player.y>380){player.y=380;player.vy=0;}
-
-drawPlayer();
-
-/* bullets */
-bullets.forEach((b,i)=>{
-b.x+=10;
-ctx.fillStyle="yellow";
-ctx.fillRect(b.x,b.y,10,5);
-
-zombies.forEach((z)=>{
-if(!z.dead && b.x>z.x && b.x<z.x+40){
-z.hp-=5;
-if(z.hp<=0){z.dead=true;coins+=1;}
-}
-});
-
-if(boss && !boss.dead && b.x>boss.x && b.x<boss.x+80){
-boss.hp-=5;
-if(boss.hp<=0){boss.dead=true;coins+=10;}
-}
-});
-
-/* zombies */
-zombies.forEach((z,i)=>{
-if(!z.dead)z.x-=2;
-drawZombie(z);
-});
-
-/* boss */
-if(boss){
-if(!boss.dead)boss.x-=1.5;
-drawBoss(boss);
-}
-
-document.getElementById("ui").innerHTML=
-"❤️ "+player.hp+
-" | 💰 "+coins+
-" | 🌊 Wave "+wave;
-
-requestAnimationFrame(update);
-}
 </script>
 </body>
 </html>
