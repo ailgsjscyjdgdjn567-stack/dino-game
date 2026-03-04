@@ -9,70 +9,75 @@
 body{margin:0;overflow:hidden;background:black;font-family:Arial;color:white}
 canvas{display:block;margin:auto}
 
+/* КНОПКИ */
 button{
 position:absolute;
-padding:12px 16px;
+padding:14px 18px;
 border:none;
 border-radius:12px;
 background:#222;
 color:white;
-font-size:14px;
-box-shadow:0 0 8px rgba(255,255,255,0.4);
+font-size:16px;
 cursor:pointer;
+box-shadow:0 0 10px rgba(255,255,255,0.4);
 }
 
 #jumpBtn{bottom:20px;left:20px;display:none}
 #shootBtn{bottom:20px;right:20px;display:none}
 #ultBtn{bottom:90px;right:20px;display:none}
-#shopBtn{top:10px;right:10px;display:none}
+#shopBtn{top:15px;right:15px;display:none}
 
+/* МЕНЮ */
 #menu,#gameOver{
 position:absolute;
 top:50%;left:50%;
 transform:translate(-50%,-50%);
-background:rgba(0,0,0,0.9);
-padding:30px;border-radius:20px;
+background:rgba(0,0,0,0.95);
+padding:30px;
+border-radius:20px;
 text-align:center;
-width:320px;
+width:340px;
 }
 
 #gameOver{display:none}
 #ui{position:absolute;top:10px;left:10px}
 
-/* SHOP */
+/* БОЛЬШОЙ МАГАЗИН */
 #shop{
 position:absolute;
 top:50%;left:50%;
 transform:translate(-50%,-50%);
-width:520px;
-height:420px;
-background:rgba(0,0,0,0.97);
-border-radius:20px;
-padding:20px;
+width:650px;
+height:500px;
+background:rgba(0,0,0,0.98);
+border-radius:25px;
+padding:25px;
 display:none;
-z-index:10;
+z-index:20;
 overflow:auto;
-box-shadow:0 0 25px rgba(0,255,0,0.6);
+box-shadow:0 0 35px rgba(0,255,0,0.7);
+text-align:center;
 }
 
-.shopBtn{
+.shopMainBtn{
+position:relative;
+width:45%;
+margin:10px 2%;
+padding:15px;
+background:#111;
+border-radius:15px;
+display:inline-block;
+font-size:20px;
+}
+
+.shopItem{
+position:relative;
 display:block;
 width:100%;
 margin:8px 0;
-padding:10px;
+padding:12px;
 background:#111;
-border-radius:10px;
-color:white;
-font-size:16px;
-}
-
-.tabBtn{
-width:48%;
-display:inline-block;
-padding:10px;
-margin:5px 1%;
-background:#222;
-border-radius:10px;
+border-radius:12px;
 }
 </style>
 </head>
@@ -94,50 +99,49 @@ border-radius:10px;
 <button id="jumpBtn">⬆</button>
 <button id="shootBtn">🔫</button>
 <button id="ultBtn">⚡</button>
-<button id="shopBtn">SHOP</button>
+<button id="shopBtn">🛒 SHOP</button>
 
 <canvas id="game" width="900" height="500" style="display:none"></canvas>
 
 <script>
+
+/* DOM */
+const menu=document.getElementById("menu");
+const shop=document.getElementById("shop");
+const ui=document.getElementById("ui");
+const gameOver=document.getElementById("gameOver");
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
+const jumpBtn=document.getElementById("jumpBtn");
+const shootBtn=document.getElementById("shootBtn");
+const ultBtn=document.getElementById("ultBtn");
+const shopBtn=document.getElementById("shopBtn");
+
+/* GAME DATA */
 let ground=420;
 let score=0;
-let coins=0;
+let coins=50; // чтобы можно было покупать
+let lives=10;
 let level=1;
-let lives=15;
-let gameRunning=false;
-let ultReady=true;
 let device="phone";
-
-let weaponDamage=5;
-let shootFlash=0;
-let recoil=0;
-let playerColor="#32cd32";
-let legendary=false;
+let gameRunning=false;
 let shopOpen=false;
 
-let player={x:100,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true,frame:0};
-let zombies=[];
-let bullets=[];
-let boss=null;
+let weaponDamage=5;
+let playerColor="#32cd32";
+let legendary=false;
 
-const planets=[
-["#000010","#000033"],
-["#1a002a","#330066"],
-["#002a1a","#004d33"],
-["#2a0000","#660000"],
-["#001a33","#003366"]
-];
+/* PLAYER */
+let player={x:100,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true};
 
-/* ===== MENU ===== */
+/* MENU */
 function startGame(){
 menu.innerHTML=`
 <h2>Выберите устройство</h2>
+<br>
 <button onclick="selectDevice('pc')">ПК</button><br><br>
-<button onclick="selectDevice('phone')">Телефон</button><br><br>
-<button onclick="selectDevice('tablet')">Планшет</button>
+<button onclick="selectDevice('phone')">Телефон</button>
 `;
 }
 
@@ -146,28 +150,17 @@ device=type;
 
 if(type==="pc"){
 menu.innerHTML=`
-<h2>💻 УПРАВЛЕНИЕ НА ПК</h2>
+<h2>💻 УПРАВЛЕНИЕ</h2>
+<p>Прыжок — ПРОБЕЛ</p>
+<p>Стрелять — Клик мыши</p>
+<p>Ульта — F</p>
 <br>
-<p>⬆ Прыжок — <b>Пробел (Space)</b></p>
-<p>🔫 Стрелять — <b>Клик мышью</b></p>
-<p>⚡ Ульта — <b>Клавиша F</b></p>
-<br>
-<button onclick="startPCGame()">НАЧАТЬ ИГРУ</button>
+<button onclick="startPCGame()">НАЧАТЬ</button>
 `;
 return;
 }
 
-/* Телефон / планшет */
-menu.style.display="none";
-canvas.style.display="block";
-shopBtn.style.display="block";
-gameRunning=true;
-
-jumpBtn.style.display="block";
-shootBtn.style.display="block";
-ultBtn.style.display="block";
-
-update();
+startMobileGame();
 }
 
 function startPCGame(){
@@ -178,54 +171,74 @@ gameRunning=true;
 update();
 }
 
+function startMobileGame(){
+menu.style.display="none";
+canvas.style.display="block";
+shopBtn.style.display="block";
+jumpBtn.style.display="block";
+shootBtn.style.display="block";
+ultBtn.style.display="block";
+gameRunning=true;
+update();
+}
+
 function restart(){location.reload();}
 
-/* ===== SHOP ===== */
+/* ===== МАГАЗИН ===== */
 shopBtn.onclick=()=>{
 shopOpen=true;
-gameRunning=false;
+gameRunning=false;   // ПАУЗА
 shop.style.display="block";
-openSkins();
+openMainShop();
 };
 
 function closeShop(){
 shopOpen=false;
 shop.style.display="none";
-gameRunning=true;
+gameRunning=true;    // ВОЗВРАТ ИГРЫ
 update();
+}
+
+function openMainShop(){
+shop.innerHTML=`
+<h1>🛒 МАГАЗИН</h1>
+<p>💰 Монеты: ${coins}</p>
+<button class="shopMainBtn" onclick="openSkins()">🎨 СКИНЫ</button>
+<button class="shopMainBtn" onclick="openWeapons()">🔫 ОРУЖИЕ</button>
+<br><br>
+<button class="shopItem" onclick="closeShop()">❌ Закрыть</button>
+`;
 }
 
 function openSkins(){
 shop.innerHTML=`
-<h2>🎨 СКИНЫ</h2>
-<button class="tabBtn" onclick="openSkins()">СКИНЫ</button>
-<button class="tabBtn" onclick="openWeapons()">ОРУЖИЕ</button>
-<hr>
-💰 Монеты: ${coins}
-<button class="shopBtn" onclick="buySkin('#32cd32',1)">🟢 Зелёный (1)</button>
-<button class="shopBtn" onclick="buySkin('blue',1)">🔵 Синий (1)</button>
-<button class="shopBtn" onclick="buySkin('red',1)">🔴 Красный (1)</button>
-<button class="shopBtn" onclick="buySkin('purple',1)">🟣 Фиолетовый (1)</button>
-<button class="shopBtn" onclick="buyLegendary()">🌈 Легендарный (20)</button>
+<h1>🎨 СКИНЫ</h1>
+<p>💰 Монеты: ${coins}</p>
+
+<button class="shopItem" onclick="buySkin('#32cd32',5)">🟢 Зелёный (5)</button>
+<button class="shopItem" onclick="buySkin('blue',5)">🔵 Синий (5)</button>
+<button class="shopItem" onclick="buySkin('red',5)">🔴 Красный (5)</button>
+<button class="shopItem" onclick="buySkin('purple',5)">🟣 Фиолетовый (5)</button>
+<button class="shopItem" onclick="buyLegendary()">🌈 Легендарный (30)</button>
+
 <br>
-<button class="shopBtn" onclick="closeShop()">Закрыть</button>
+<button class="shopItem" onclick="openMainShop()">⬅ Назад</button>
 `;
 }
 
 function openWeapons(){
 shop.innerHTML=`
-<h2>🔫 ОРУЖИЕ</h2>
-<button class="tabBtn" onclick="openSkins()">СКИНЫ</button>
-<button class="tabBtn" onclick="openWeapons()">ОРУЖИЕ</button>
-<hr>
-💰 Монеты: ${coins}
-<button class="shopBtn" onclick="buyWeapon(5,10)">🔫 Пистолет (10)</button>
-<button class="shopBtn" onclick="buyWeapon(7,10)">🔫 АК-47 (10)</button>
-<button class="shopBtn" onclick="buyWeapon(10,10)">💥 Гранатомёт (10)</button>
-<button class="shopBtn" onclick="buyWeapon(15,10)">⚡ Лазер (10)</button>
-<button class="shopBtn" onclick="buyWeapon(20,10)">🔥 Плазма (10)</button>
+<h1>🔫 ОРУЖИЕ</h1>
+<p>💰 Монеты: ${coins}</p>
+
+<button class="shopItem" onclick="buyWeapon(5,10)">🔫 Пистолет (10)</button>
+<button class="shopItem" onclick="buyWeapon(8,20)">🔫 АК-47 (20)</button>
+<button class="shopItem" onclick="buyWeapon(15,30)">💥 Гранатомёт (30)</button>
+<button class="shopItem" onclick="buyWeapon(20,40)">⚡ Лазер (40)</button>
+<button class="shopItem" onclick="buyWeapon(30,50)">🔥 Плазма (50)</button>
+
 <br>
-<button class="shopBtn" onclick="closeShop()">Закрыть</button>
+<button class="shopItem" onclick="openMainShop()">⬅ Назад</button>
 `;
 }
 
@@ -239,8 +252,8 @@ openSkins();
 }
 
 function buyLegendary(){
-if(coins>=20){
-coins-=20;
+if(coins>=30){
+coins-=30;
 legendary=true;
 openSkins();
 }
@@ -254,125 +267,27 @@ openWeapons();
 }
 }
 
-/* ===== CONTROLS ===== */
-jumpBtn.onclick=()=>{if(player.grounded){player.vy=player.jump;player.grounded=false;}};
-shootBtn.onclick=()=>shoot();
-ultBtn.onclick=()=>useUlt();
-
-document.addEventListener("keydown",e=>{
-if(device!=="pc")return;
-if(e.code==="Space"&&player.grounded){
-player.vy=player.jump;
-player.grounded=false;
-}
-if(e.key==="f")useUlt();
-});
-
-canvas.addEventListener("mousedown",()=>{
-if(device==="pc")shoot();
-});
-
-function shoot(){
-bullets.push({x:player.x+75,y:player.y+21});
-shootFlash=5;
-recoil=5;
-}
-
-function useUlt(){
-if(!ultReady)return;
-ultReady=false;
-zombies=[];
-if(boss)boss.hp-=40;
-setTimeout(()=>ultReady=true,8000);
-}
-
-/* ===== SPAWN ===== */
-setInterval(()=>{
-if(gameRunning)
-zombies.push({x:900,y:ground-60,hp:9+level,frame:0});
-},2000);
-
-function spawnBoss(){
-boss={x:900,y:ground-200,hp:120+level*30};
-}
-
-/* ===== GAME LOOP ===== */
+/* GAME LOOP */
 function update(){
 if(!gameRunning)return;
 
-let p=planets[level%planets.length];
-let grad=ctx.createLinearGradient(0,0,0,500);
-grad.addColorStop(0,p[0]);
-grad.addColorStop(1,p[1]);
-ctx.fillStyle=grad;
+ctx.fillStyle="black";
 ctx.fillRect(0,0,900,500);
 
 /* Player */
-player.vy+=player.gravity;
-player.y+=player.vy;
-if(player.y>=ground-60){player.y=ground-60;player.vy=0;player.grounded=true;}
-player.frame+=0.15;
-
 if(legendary){
-let r=Math.floor(128+128*Math.sin(player.frame));
-let g=Math.floor(128+128*Math.sin(player.frame+2));
-let b=Math.floor(128+128*Math.sin(player.frame+4));
-playerColor=`rgb(${r},${g},${b})`;
+playerColor=`hsl(${Date.now()/10%360},100%,50%)`;
 }
 
 ctx.fillStyle=playerColor;
-ctx.fillRect(player.x,player.y,50,40);
-ctx.beginPath();
-ctx.arc(player.x+45,player.y+10,15,0,Math.PI*2);
-ctx.fill();
+ctx.fillRect(player.x,player.y,60,50);
 
-/* Gun */
-ctx.fillStyle="black";
-ctx.fillRect(player.x+55,player.y+18,18,6);
-
-/* Bullets */
-bullets.forEach((b,i)=>{
-b.x+=12;
-ctx.fillStyle="yellow";
-ctx.fillRect(b.x,b.y,8,4);
-
-zombies.forEach((z,zi)=>{
-if(b.x>z.x && b.x<z.x+40){
-z.hp-=weaponDamage;
-bullets.splice(i,1);
-if(z.hp<=0){zombies.splice(zi,1);score++;coins++;}
-}
-});
-
-if(boss && b.x>boss.x && b.x<boss.x+280){
-boss.hp-=weaponDamage;
-bullets.splice(i,1);
-}
-});
-
-/* Zombies */
-zombies.forEach((z,i)=>{
-z.x-=2+level*0.5;
-ctx.fillStyle="#2ecc71";
-ctx.fillRect(z.x,z.y,40,50);
-if(z.x<player.x+40){lives--;zombies.splice(i,1);}
-});
-
-/* Boss */
-if(score>=30 && !boss)spawnBoss();
-if(boss){
-boss.x-=1;
-ctx.fillStyle="darkred";
-ctx.fillRect(boss.x,boss.y,280,160);
-if(boss.hp<=0){coins+=30;level++;boss=null;}
-}
-
-ui.innerHTML="🏆 "+score+" ❤️ "+lives+" 💰 "+coins+" 🌍 "+level+" ⚡ "+(ultReady?"READY":"...");
-
-if(lives<=0){gameRunning=false;gameOver.style.display="block";}
+/* UI */
+ui.innerHTML="🏆 "+score+" ❤️ "+lives+" 💰 "+coins;
 
 requestAnimationFrame(update);
 }
+
 </script>
 </body>
 </html>
