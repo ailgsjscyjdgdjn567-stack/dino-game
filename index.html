@@ -3,66 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Disaster Simulator</title>
+    <title>Ultimate Flight Simulator 2026</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
         canvas { display: block; }
-        
-        #ui-layer { position: absolute; inset: 0; pointer-events: none; color: white; }
-        .panel { position: absolute; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px; pointer-events: auto; border: 1px solid #444; }
-        
-        /* Панель катастроф */
-        #disaster-panel { top: 10px; right: 10px; width: 180px; }
-        .dis-btn { width: 100%; background: #c0392b; color: white; border: none; padding: 8px; margin-bottom: 5px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        .dis-btn:hover { background: #ff4757; }
-        
-        /* Телеметрия */
-        #stats { top: 10px; left: 10px; }
-        #passengers { bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; text-align: center; }
-        
-        /* Джойстик для мобилок */
-        #joystick-wrapper { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; pointer-events: auto; }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; opacity: 0.5; }
 
-        #game-over { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 40px; border-radius: 20px; text-align: center; display: none; pointer-events: auto; border: 2px solid #e74c3c; }
-        .retry-btn { background: #27ae60; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-size: 20px; cursor: pointer; }
+        /* МЕНЮ */
+        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; text-align: center; }
+        .btn { padding: 15px 40px; margin: 10px; font-size: 18px; cursor: pointer; background: #2980b9; color: white; border: none; border-radius: 5px; }
+        
+        /* ИНТЕРФЕЙС */
+        #ui { position: absolute; top: 10px; left: 10px; color: #0f0; background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid #0f0; pointer-events: none; display: none; }
+        #disaster-ui { position: absolute; top: 10px; right: 10px; display: none; flex-direction: column; gap: 5px; }
+        .dis-btn { background: #c0392b; color: white; border: 1px solid white; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+
+        /* ПАССАЖИРЫ */
+        #cabin-chatter { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); color: #fff; text-shadow: 2px 2px #000; font-style: italic; font-size: 18px; text-align: center; pointer-events: none; width: 80%; }
+
+        /* МОБИЛЬНОЕ УПРАВЛЕНИЕ */
+        #mobile-ui { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: space-between; padding: 0 30px; box-sizing: border-box; }
+        #joy-base { width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; position: relative; }
+        #joy-stick { width: 40px; height: 40px; background: #fff; border-radius: 50%; position: absolute; top: 30px; left: 30px; }
+        .action-btn { width: 70px; height: 70px; background: #f1c40f; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 30px; border: 2px solid #fff; }
+
+        #gear-status { color: #f1c40f; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="ui-layer">
-    <div id="stats" class="panel">
-        Высота: <span id="alt">0</span> м<br>
-        Скорость: <span id="spd">0</span> км/ч
-    </div>
+<div id="overlay">
+    <h1>SKY DISASTER SIMULATOR</h1>
+    <p>Выберите устройство для калибровки систем:</p>
+    <button class="btn" onclick="start('pc')">💻 КОМПЬЮТЕР (Мышь + F)</button>
+    <button class="btn" onclick="start('mobile')">📱 ТЕЛЕФОН (Джойстик)</button>
+</div>
 
-    <div id="disaster-panel" class="panel">
-        <div style="color: #f1c40f; font-weight: bold; margin-bottom: 10px; text-align: center;">🚨 КАТАСТРОФЫ</div>
-        <button class="dis-btn" onclick="trigger('engine')">Отказ двигателя</button>
-        <button class="dis-btn" onclick="trigger('fire')">Пожар на борту</button>
-        <button class="dis-btn" onclick="trigger('wing')">Разрушение крыла</button>
-        <button class="dis-btn" onclick="trigger('lightning')">Удар молнии</button>
-        <button class="dis-btn" onclick="trigger('alien')">НЛО / Похищение</button>
-    </div>
+<div id="ui">
+    ВЫСОТА: <span id="alt">0</span> м<br>
+    СКОРОСТЬ: <span id="spd">0</span> км/ч<br>
+    ШАССИ: <span id="gear-status">УБРАНЫ</span>
+</div>
 
-    <div id="passengers" class="panel">
-        👥 Статус: <span id="p-status" style="color: #2ecc71;">Спокойны</span>
-        <div id="p-scream" style="color: #ff4757; font-weight: bold; height: 20px;"></div>
-    </div>
+<div id="disaster-ui">
+    <button class="dis-btn" onclick="trigger('engine')">ОТКАЗ ДВИГАТЕЛЯ</button>
+    <button class="dis-btn" onclick="trigger('fire')">ПОЖАР</button>
+    <button class="dis-btn" onclick="trigger('wing')">КРЫЛО</button>
+    <button class="dis-btn" onclick="trigger('lightning')">МОЛНИЯ</button>
+    <button class="dis-btn" onclick="trigger('alien')">ВЫЗВАТЬ НЛО</button>
+</div>
 
-    <div id="joystick-wrapper"><div id="joystick-stick"></div></div>
+<div id="cabin-chatter"></div>
 
-    <div id="game-over">
-        <h1 id="death-reason" style="color: #e74c3c;">САМОЛЕТ УНИЧТОЖЕН</h1>
-        <p id="death-desc"></p>
-        <button class="retry-btn" onclick="location.reload()">НОВЫЙ РЕЙС</button>
-    </div>
+<div id="mobile-ui">
+    <div id="joy-base"><div id="joy-stick"></div></div>
+    <div class="action-btn" onclick="toggleGear()">🎡</div>
 </div>
 
 <script>
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 document.body.appendChild(canvas);
+const chatterBox = document.getElementById('cabin-chatter');
+
+let isMobile = false;
+let gameActive = false;
+let plane = {
+    x: 200, y: 300, w: 80, h: 20,
+    angle: 0, speed: 7, targetAngle: 0,
+    gear: false, gearY: 0,
+    engineOk: true, broken: false, fire: false, wingLost: false,
+    timer: 0, deathTimer: -1,
+    ufoActive: false, ufoX: -200, ufoY: 0
+};
+
+let worldX = 0;
+let timeOfDay = 0;
+let mouse = { x: 200, y: 300 };
+let joy = { x: 0, y: 0, active: false };
 
 function resize() {
     canvas.width = window.innerWidth;
@@ -71,203 +88,205 @@ function resize() {
 window.onresize = resize;
 resize();
 
-// --- Настройки ---
-let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-if(isMobile) document.getElementById('joystick-wrapper').style.display = 'block';
-
-let plane = {
-    x: 300, y: canvas.height/2,
-    angle: 0, speed: 5, targetAngle: 0,
-    broken: false, fire: false, wingLost: false,
-    parts: [], screamTimer: 0
-};
-
-let mouse = { x: 300, y: canvas.height/2 };
-let joy = { x: 0, y: 0, active: false };
-let worldX = 0;
-let time = 0;
-
-// --- Управление ---
-window.onmousemove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; };
-
-const joyWrapper = document.getElementById('joystick-wrapper');
-const joyStick = document.getElementById('joystick-stick');
-
-joyWrapper.ontouchmove = (e) => {
-    e.preventDefault();
-    let rect = joyWrapper.getBoundingClientRect();
-    let touch = e.touches[0];
-    let tx = touch.clientX - rect.left - 60;
-    let ty = touch.clientY - rect.top - 60;
-    let dist = Math.sqrt(tx*tx + ty*ty);
-    if(dist > 50) { tx *= 50/dist; ty *= 50/dist; }
-    joyStick.style.transform = `translate(${tx}px, ${ty}px)`;
-    joy.x = tx/50; joy.y = ty/50; joy.active = true;
-};
-joyWrapper.ontouchend = () => {
-    joyStick.style.transform = `translate(0, 0)`;
-    joy.active = false;
-};
-
-// --- Функции ---
-function trigger(type) {
-    if(plane.broken) return;
-    plane.broken = true;
-    let reason = "";
-    
-    if(type === 'engine') { reason = "Двигатели заглохли!"; plane.speed = 2; }
-    if(type === 'fire') { reason = "Пожар в хвосте!"; plane.fire = true; }
-    if(type === 'wing') { reason = "Левое крыло оторвано!"; plane.wingLost = true; }
-    if(type === 'lightning') { reason = "Прямое попадание молнии!"; }
-    if(type === 'alien') { reason = "НЛО разрезал корпус!"; }
-
-    document.getElementById('p-status').innerText = "ПАНИКА!!!";
-    document.getElementById('p-status').style.color = "red";
-    document.getElementById('game-over').style.display = 'block';
-    document.getElementById('death-desc').innerText = reason;
+function start(mode) {
+    isMobile = (mode === 'mobile');
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('ui').style.display = 'block';
+    document.getElementById('disaster-ui').style.display = 'flex';
+    if(isMobile) document.getElementById('mobile-ui').style.display = 'flex';
+    gameActive = true;
+    loop();
 }
 
-function update() {
-    if(!plane.broken) {
+// --- УПРАВЛЕНИЕ ---
+window.onmousemove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; };
+window.onkeydown = (e) => { if(e.code === 'KeyF') toggleGear(); };
+
+function toggleGear() {
+    plane.gear = !plane.gear;
+    document.getElementById('gear-status').innerText = plane.gear ? "ВЫПУЩЕНЫ" : "УБРАНЫ";
+    document.getElementById('gear-status').style.color = plane.gear ? "#2ecc71" : "#f1c40f";
+    say(plane.gear ? "Стюардесса: Подготовка к посадке..." : "Пилот: Шасси убраны, набираем ход.");
+}
+
+function trigger(type) {
+    if(plane.deathTimer > 0) return;
+    plane.deathTimer = 60 * 60; // 1 минута до полного разрушения
+    
+    if(type === 'engine') {
+        plane.engineOk = false;
+        say("ОБЪЯВЛЕНИЕ: Дамы и господа, у нас небольшая техническая заминка с двигателем...");
+    }
+    if(type === 'fire') { plane.fire = true; say("ПАССАЖИР: ЭЙ! ПОЧЕМУ ИЗ ХВОСТА ИДЕТ ДЫМ?!"); }
+    if(type === 'wing') { plane.wingLost = true; say("ПИЛОТ: МЭЙДЭЙ! ТЕРЯЕМ ОБШИВКУ КРЫЛА!"); }
+    if(type === 'lightning') { say("БАБАХ! Молния выжгла навигацию!"); plane.angle += 0.5; }
+    if(type === 'alien') { plane.ufoActive = true; say("ПАССАЖИР: ЧТО ЭТО ЗА СВЕТЯЩАЯСЯ ТАРЕЛКА СНАРУЖИ?!"); }
+}
+
+function say(text) {
+    chatterBox.innerText = text;
+    setTimeout(() => { if(chatterBox.innerText === text) chatterBox.innerText = ""; }, 4000);
+}
+
+// Мобильный джойстик
+const jBase = document.getElementById('joy-base');
+const jStick = document.getElementById('joy-stick');
+jBase.ontouchmove = (e) => {
+    e.preventDefault();
+    let r = jBase.getBoundingClientRect();
+    let tx = e.touches[0].clientX - r.left - 50;
+    let ty = e.touches[0].clientY - r.top - 50;
+    let d = Math.sqrt(tx*tx + ty*ty);
+    if(d > 40) { tx *= 40/d; ty *= 40/d; }
+    jStick.style.transform = `translate(${tx}px, ${ty}px)`;
+    joy.x = tx/40; joy.y = ty/40; joy.active = true;
+};
+jBase.ontouchend = () => { jStick.style.transform = `translate(0,0)`; joy.active = false; };
+
+function loop() {
+    if(!gameActive) return;
+
+    // ЛОГИКА ПОЛЕТА
+    if(plane.engineOk) {
         if(!isMobile) {
             let dx = mouse.x - plane.x;
             let dy = mouse.y - plane.y;
             plane.targetAngle = Math.atan2(dy, dx);
-            plane.speed = Math.min(10, Math.sqrt(dx*dx + dy*dy) / 20);
+            plane.speed = Math.min(10, Math.sqrt(dx*dx + dy*dy)/20);
         } else if(joy.active) {
             plane.targetAngle = Math.atan2(joy.y, joy.x);
             plane.speed = 8;
         }
-
-        // Плавный поворот
-        let diff = plane.targetAngle - plane.angle;
-        while(diff < -Math.PI) diff += Math.PI*2;
-        while(diff > Math.PI) diff -= Math.PI*2;
-        plane.angle += diff * 0.05;
-
-        plane.y += Math.sin(plane.angle) * plane.speed;
-        worldX += Math.cos(plane.angle) * plane.speed;
-
-        // Лимит космоса
-        if(plane.y < -500) trigger('space');
-        // Земля
-        if(plane.y > canvas.height - 80) {
-            if(plane.speed > 3) trigger('crash');
-            else plane.y = canvas.height - 80;
-        }
     } else {
-        plane.y += 5; // Падение
-        plane.angle += 0.1;
-        plane.speed *= 0.95;
+        // Режим планирования при отказе
+        plane.speed *= 0.998;
+        plane.targetAngle = 0.2; // Тянет вниз
+        if(plane.speed < 2) plane.speed = 2;
     }
 
-    // Пассажиры кричат
-    if(plane.broken || plane.y < 100 || plane.y > canvas.height - 200) {
-        plane.screamTimer++;
-        if(plane.screamTimer % 30 === 0) {
-            const screams = ["ААААА!", "МЫ ПАДАЕМ!", "ГДЕ ПАРАШЮТ?!", "ГОСПОДИ!", "МАМА!"];
-            document.getElementById('p-scream').innerText = screams[Math.floor(Math.random()*screams.length)];
+    if(plane.gear) plane.speed *= 0.95; // Шасси тормозят
+
+    let diff = plane.targetAngle - plane.angle;
+    while(diff < -Math.PI) diff += Math.PI*2;
+    while(diff > Math.PI) diff -= Math.PI*2;
+    plane.angle += diff * 0.05;
+
+    plane.y += Math.sin(plane.angle) * plane.speed + 1; // Гравитация
+    worldX += Math.cos(plane.angle) * plane.speed;
+
+    // ПРОВЕРКА КАТАСТРОФЫ
+    if(plane.deathTimer > 0) {
+        plane.deathTimer--;
+        if(plane.deathTimer === 1) { plane.broken = true; say("САМОЛЕТ РАЗВАЛИЛСЯ В ВОЗДУХЕ!"); }
+    }
+
+    if(plane.y < -1000) { say("КОСМОС! ДВИГАТЕЛИ ЗАГЛОХЛИ!"); plane.engineOk = false; }
+    
+    // ЗЕМЛЯ И АЭРОПОРТ
+    if(plane.y > canvas.height - 100) {
+        let onRunway = (worldX % 1500 < 300);
+        if(onRunway && plane.gear && plane.speed < 5) {
+            plane.y = canvas.height - 110;
+            plane.speed *= 0.9;
+            plane.angle = 0;
+            say("ПИЛОТ: Успешная посадка. Добро пожаловать!");
+        } else {
+            gameActive = false;
+            alert("КАТАСТРОФА! " + (onRunway ? "Забыли шасси или большая скорость!" : "Разбились в поле!"));
+            location.reload();
         }
     }
 
-    time += 0.002;
     draw();
-    requestAnimationFrame(update);
+    requestAnimationFrame(loop);
 }
 
 function draw() {
-    // 1. Небо
-    let altFactor = Math.max(0, 1 - (plane.y + 500) / 1500);
-    let dayNight = (Math.sin(time) + 1) / 2;
-    
-    let r = Math.floor(100 * (1-altFactor) * (1-dayNight));
-    let g = Math.floor(180 * (1-altFactor) * (1-dayNight));
-    let b = Math.floor(255 * (1-altFactor));
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    ctx.fillRect(0,0,canvas.width, canvas.height);
+    timeOfDay += 0.001;
+    let day = (Math.sin(timeOfDay) + 1) / 2;
+    let space = Math.min(1, Math.max(0, -plane.y / 800));
 
-    // 2. Светила
-    ctx.fillStyle = dayNight > 0.5 ? "#eee" : "#f1c40f";
+    // НЕБО
+    ctx.fillStyle = `rgb(${20*(1-day)}, ${100*(1-day)*(1-space)}, ${255*(1-space)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // СОЛНЦЕ / ЛУНА
+    ctx.fillStyle = day > 0.5 ? "#fff" : "#ff0";
     ctx.beginPath();
-    ctx.arc(canvas.width - 150, 150 + Math.cos(time)*100, 40, 0, Math.PI*2);
+    ctx.arc(canvas.width - 100, 100 + Math.sin(timeOfDay)*100, 30, 0, Math.PI*2);
     ctx.fill();
 
-    // 3. Облака (Параллакс)
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    for(let i=0; i<8; i++) {
-        let cx = (i * 500 - worldX * 0.3) % (canvas.width + 400);
-        if(cx < -200) cx += canvas.width + 400;
-        ctx.beginPath();
-        ctx.arc(cx, 100 + i*80, 40, 0, Math.PI*2);
-        ctx.arc(cx+40, 100 + i*80, 50, 0, Math.PI*2);
-        ctx.fill();
-    }
-
-    // 4. Земля и города
-    ctx.fillStyle = "#1e3799"; // Горизонт
+    // ЗЕМЛЯ И АЭРОПОРТЫ (1.5 км = 1500 единиц)
+    ctx.fillStyle = "#2ecc71";
     ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
     
-    for(let i=0; i<15; i++) {
-        let gx = (i * 250 - worldX) % (canvas.width + 500);
-        if(gx < -250) gx += canvas.width + 500;
-        
-        // Здания
-        ctx.fillStyle = "#2f3542";
-        ctx.fillRect(gx, canvas.height - 180, 60, 80);
-        ctx.fillStyle = "#f1c40f";
-        ctx.fillRect(gx+10, canvas.height-170, 10, 10); // Окна
-        
-        // Машины
-        ctx.fillStyle = "red";
-        ctx.fillRect(gx + (time*1000 % 200), canvas.height - 40, 15, 8);
+    for(let i=-2; i<5; i++) {
+        let x = (i * 1500 - worldX) % (1500 * 5);
+        if(x < -500) x += 7500;
         
         // Аэропорт
-        if(i % 7 === 0) {
-            ctx.fillStyle = "#57606f";
-            ctx.fillRect(gx+100, canvas.height - 105, 300, 10);
-            ctx.fillStyle = "white";
-            ctx.font = "bold 12px Arial";
-            ctx.fillText("AIRPORT - LAND HERE", gx+150, canvas.height - 115);
+        ctx.fillStyle = "#333";
+        ctx.fillRect(x, canvas.height - 105, 400, 10);
+        ctx.fillStyle = "#fff";
+        for(let j=0; j<10; j++) ctx.fillRect(x + j*40, canvas.height-100, 20, 2);
+        
+        // Город рядом
+        ctx.fillStyle = "#2c3e50";
+        ctx.fillRect(x + 500, canvas.height - 200, 60, 100);
+        ctx.fillRect(x + 580, canvas.height - 150, 40, 50);
+    }
+
+    // НЛО
+    if(plane.ufoActive) {
+        plane.ufoX += (plane.x - 150 - plane.ufoX) * 0.02;
+        plane.ufoY += (plane.y - plane.ufoY) * 0.02;
+        ctx.fillStyle = "silver";
+        ctx.beginPath(); ctx.ellipse(plane.ufoX, plane.ufoY, 40, 15, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "cyan";
+        ctx.beginPath(); ctx.arc(plane.ufoX, plane.ufoY-5, 10, 0, Math.PI*2); ctx.fill();
+        
+        if(Math.random() > 0.95) {
+            ctx.strokeStyle = "lime"; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(plane.ufoX, plane.ufoY); ctx.lineTo(plane.x, plane.y); ctx.stroke();
+            if(plane.deathTimer < 0) trigger('fire');
         }
     }
 
-    // 5. Самолет
+    // САМОЛЕТ
     ctx.save();
     ctx.translate(plane.x, plane.y);
     ctx.rotate(plane.angle);
     
-    // Эффекты
     if(plane.fire) {
         ctx.fillStyle = "orange";
-        ctx.beginPath(); ctx.arc(-30, 0, 15 + Math.random()*10, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-40, 0, 10 + Math.random()*10, 0, Math.PI*2); ctx.fill();
     }
 
-    // Корпус
-    ctx.fillStyle = "#f1f2f6";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 40, 12, 0, 0, Math.PI*2);
-    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.fillRect(-40, -10, 80, 20); // Корпус
+    ctx.fillStyle = "blue";
+    ctx.fillRect(20, -5, 15, 5); // Окна
     
     // Крылья
-    if(!plane.wingLost) {
-        ctx.fillStyle = "#ced6e0";
-        ctx.fillRect(-10, -30, 15, 60);
+    ctx.fillStyle = "lightgray";
+    ctx.fillRect(-10, -35, 20, 70);
+    if(plane.wingLost) {
+        ctx.fillStyle = "red"; ctx.fillRect(-10, 10, 20, 25); // Поврежденное крыло
     }
-    
-    // Кабина
-    ctx.fillStyle = "#2f3542";
-    ctx.beginPath();
-    ctx.arc(25, -2, 8, 0, Math.PI*2);
-    ctx.fill();
-    
+
+    // Шасси анимация
+    if(plane.gear) {
+        ctx.fillStyle = "black";
+        ctx.fillRect(-20, 10, 5, 15);
+        ctx.fillRect(10, 10, 5, 15);
+    }
+
     ctx.restore();
 
     // UI
-    document.getElementById('alt').innerText = Math.floor(Math.max(0, (canvas.height - 100 - plane.y)));
-    document.getElementById('spd').innerText = Math.floor(plane.speed * 45);
+    document.getElementById('alt').innerText = Math.floor(Math.max(0, canvas.height - 100 - plane.y));
+    document.getElementById('spd').innerText = Math.floor(plane.speed * 50);
 }
-
-update();
 </script>
 </body>
 </html>
