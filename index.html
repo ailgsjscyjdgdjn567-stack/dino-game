@@ -2,233 +2,290 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Dino Galaxy 2.0</title>
+<title>Dino Galaxy Ultimate</title>
 <style>
 body{margin:0;overflow:hidden;background:black;font-family:Arial;color:white}
-canvas{display:block;margin:auto}
-#menu,#shop{
+canvas{display:block;margin:auto;background:#111}
+.menu{
 position:absolute;top:50%;left:50%;
 transform:translate(-50%,-50%);
-background:#111;padding:30px;border-radius:20px;
+background:#1a1a1a;padding:30px;border-radius:20px;
 text-align:center;z-index:10;
 }
-button{padding:10px 15px;margin:5px;border:none;border-radius:10px;background:#222;color:white;cursor:pointer}
-#ui{position:absolute;top:10px;left:10px}
+button{
+padding:10px 20px;
+margin:8px;
+border:none;
+border-radius:10px;
+background:#333;
+color:white;
+cursor:pointer;
+font-size:16px;
+}
+#ui{
+position:absolute;
+top:10px;
+left:10px;
+font-size:18px;
+}
 </style>
 </head>
 <body>
 
-<div id="menu">
-<h1>🦖 DINO GALAXY 2.0</h1>
-<button onclick="start()">PLAY</button>
+<div id="mainMenu" class="menu">
+<h1>🐲 DINO GALAXY</h1>
+<p>Выберите устройство</p>
+<button onclick="setDevice('pc')">ПК</button>
+<button onclick="setDevice('mobile')">Телефон</button>
+<button onclick="setDevice('tablet')">Планшет</button>
 </div>
 
-<div id="shop" style="display:none"></div>
+<div id="shop" class="menu" style="display:none;"></div>
 <div id="ui"></div>
-<canvas id="game" width="900" height="500" style="display:none"></canvas>
+
+<canvas id="game" width="1000" height="500" style="display:none;"></canvas>
 
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
-const menu=document.getElementById("menu");
-const shop=document.getElementById("shop");
-const ui=document.getElementById("ui");
 
-/* SAVE SYSTEM */
-let save=JSON.parse(localStorage.getItem("dinoSave"))||{
-coins:0,
-maxHP:10,
-damage:5,
-ultCD:8000
-};
-function saveGame(){
-localStorage.setItem("dinoSave",JSON.stringify(save));
+let device="pc";
+let gameRunning=false;
+let paused=false;
+
+let player={x:150,y:380,vy:0,hp:20};
+let gravity=1;
+
+let zombies=[];
+let bullets=[];
+let boss=null;
+
+let coins=0;
+let wave=1;
+
+let spawnInterval=null;
+
+/* DEVICE SELECT */
+function setDevice(type){
+device=type;
+document.getElementById("mainMenu").style.display="none";
+canvas.style.display="block";
+startGame();
 }
 
-/* GAME DATA */
-let player={x:100,y:380,vy:0,hp:save.maxHP};
-let gravity=1;
-let bullets=[];
-let zombies=[];
-let particles=[];
-let wave=1;
-let spawnCount=0;
-let gameRunning=false;
-let ultReady=true;
-let shake=0;
-let damageFlash=0;
-
-/* START */
-function start(){
-menu.style.display="none";
-canvas.style.display="block";
+/* START GAME */
+function startGame(){
 gameRunning=true;
-nextWave();
+spawnInterval=setInterval(spawnZombies,5000);
 update();
 }
 
-/* WAVES */
-function nextWave(){
-spawnCount=5+wave*2;
-setTimeout(()=>spawnZombie(),1000);
+/* SPAWN 3 ZOMBIES EVERY 5 SEC */
+function spawnZombies(){
+if(!gameRunning)return;
+
+for(let i=0;i<3;i++){
+zombies.push(createZombie());
 }
 
-function spawnZombie(){
-if(spawnCount<=0)return;
-let type=Math.random();
-let z={x:900,y:380,type:"normal",hp:5+wave};
-if(type<0.25){z.type="fast";z.hp=3+wave;}
-else if(type<0.5){z.type="tank";z.hp=15+wave*2;}
-else if(type<0.65){z.type="boom";z.hp=4+wave;}
-zombies.push(z);
-spawnCount--;
-setTimeout(spawnZombie,800);
+if(wave%5===0 && !boss){
+boss=createBoss();
+}
+
+wave++;
+}
+
+/* CREATE ZOMBIE */
+function createZombie(){
+return{
+x:1000,
+y:380,
+hp:9,
+frame:0,
+dead:false,
+deathFrame:0
+};
+}
+
+/* CREATE BOSS DRAGON */
+function createBoss(){
+return{
+x:1000,
+y:300,
+hp:29,
+frame:0,
+dead:false,
+deathFrame:0
+};
 }
 
 /* CONTROLS */
 document.addEventListener("keydown",e=>{
+if(device==="pc"){
 if(e.code==="Space")player.vy=-18;
-if(e.key==="f")useUlt();
+if(e.key==="f")shoot();
+if(e.key==="b")openShop();
+}
 });
-canvas.addEventListener("mousedown",()=>shoot());
+
+canvas.addEventListener("click",()=>{
+if(device!=="pc")shoot();
+});
 
 function shoot(){
 bullets.push({x:player.x+60,y:player.y+20});
 }
 
-function useUlt(){
-if(!ultReady)return;
-ultReady=false;
-zombies=[];
-setTimeout(()=>ultReady=true,save.ultCD);
-}
-
 /* SHOP */
-document.addEventListener("keydown",e=>{
-if(e.key==="b")openShop();
-});
-
 function openShop(){
-gameRunning=false;
-shop.style.display="block";
-shop.innerHTML=`
+paused=true;
+document.getElementById("shop").style.display="block";
+document.getElementById("shop").innerHTML=`
 <h2>МАГАЗИН</h2>
-<p>💰 ${save.coins}</p>
-<button onclick="upgradeHP()">+HP (20)</button>
-<button onclick="upgradeDMG()">+Урон (20)</button>
-<button onclick="upgradeUlt()">-КД Ульты (30)</button>
-<br><button onclick="closeShop()">Закрыть</button>
+<p>Монеты: ${coins}</p>
+<button onclick="closeShop()">Закрыть</button>
 `;
 }
 
 function closeShop(){
-shop.style.display="none";
-gameRunning=true;
+paused=false;
+document.getElementById("shop").style.display="none";
 update();
 }
 
-function upgradeHP(){
-if(save.coins>=20){
-save.coins-=20;
-save.maxHP+=5;
-player.hp=save.maxHP;
-saveGame();
-openShop();
-}
-}
-function upgradeDMG(){
-if(save.coins>=20){
-save.coins-=20;
-save.damage+=2;
-saveGame();
-openShop();
-}
-}
-function upgradeUlt(){
-if(save.coins>=30){
-save.coins-=30;
-save.ultCD=Math.max(2000,save.ultCD-1000);
-saveGame();
-openShop();
-}
-}
+/* DRAW PLAYER DRAGON */
+function drawPlayer(){
+ctx.fillStyle="green";
+ctx.fillRect(player.x,player.y,70,50);
 
-/* LOOP */
-function update(){
-if(!gameRunning)return;
-
-ctx.save();
-ctx.translate(Math.random()*shake,Math.random()*shake);
+/* глаз */
+ctx.fillStyle="white";
+ctx.fillRect(player.x+50,player.y+10,10,10);
 ctx.fillStyle="black";
-ctx.fillRect(0,0,900,500);
+ctx.fillRect(player.x+55,player.y+13,5,5);
 
-/* Player physics */
+/* ноги анимация */
+let legOffset=Math.sin(Date.now()/100)*5;
+ctx.fillStyle="darkgreen";
+ctx.fillRect(player.x+10,player.y+50,10,20+legOffset);
+ctx.fillRect(player.x+40,player.y+50,10,20-legOffset);
+
+/* рука */
+ctx.fillRect(player.x+65,player.y+20,15,10);
+}
+
+/* DRAW ZOMBIE */
+function drawZombie(z){
+if(z.dead){
+ctx.fillStyle="red";
+ctx.globalAlpha=1-(z.deathFrame/30);
+ctx.fillRect(z.x,z.y,40,40);
+ctx.globalAlpha=1;
+z.deathFrame++;
+return;
+}
+
+ctx.fillStyle="green";
+ctx.fillRect(z.x,z.y,40,40);
+
+/* глаза */
+ctx.fillStyle="white";
+ctx.fillRect(z.x+5,z.y+10,8,8);
+ctx.fillRect(z.x+20,z.y+10,8,8);
+
+/* рот */
+ctx.fillStyle="black";
+ctx.fillRect(z.x+10,z.y+25,15,5);
+
+/* ноги бег */
+let leg=Math.sin(Date.now()/150)*5;
+ctx.fillRect(z.x+5,z.y+40,8,20+leg);
+ctx.fillRect(z.x+25,z.y+40,8,20-leg);
+
+/* руки */
+ctx.fillRect(z.x-5,z.y+15,10,8);
+ctx.fillRect(z.x+35,z.y+15,10,8);
+}
+
+/* DRAW BOSS */
+function drawBoss(b){
+if(b.dead){
+ctx.fillStyle="orange";
+ctx.globalAlpha=1-(b.deathFrame/60);
+ctx.fillRect(b.x,b.y,80,80);
+ctx.globalAlpha=1;
+b.deathFrame++;
+return;
+}
+
+ctx.fillStyle="purple";
+ctx.fillRect(b.x,b.y,80,80);
+
+/* глаза */
+ctx.fillStyle="red";
+ctx.fillRect(b.x+20,b.y+20,15,15);
+ctx.fillRect(b.x+50,b.y+20,15,15);
+
+/* крылья */
+ctx.fillStyle="darkred";
+ctx.fillRect(b.x-30,b.y+10,30,40);
+ctx.fillRect(b.x+80,b.y+10,30,40);
+
+/* ноги */
+let leg=Math.sin(Date.now()/120)*8;
+ctx.fillRect(b.x+15,b.y+80,15,30+leg);
+ctx.fillRect(b.x+50,b.y+80,15,30-leg);
+}
+
+/* UPDATE LOOP */
+function update(){
+if(!gameRunning||paused)return;
+
+ctx.clearRect(0,0,1000,500);
+
+/* physics */
 player.vy+=gravity;
 player.y+=player.vy;
 if(player.y>380){player.y=380;player.vy=0;}
 
-/* Player */
-ctx.fillStyle="lime";
-ctx.fillRect(player.x,player.y,50,40);
+drawPlayer();
 
-/* Bullets */
+/* bullets */
 bullets.forEach((b,i)=>{
 b.x+=10;
 ctx.fillStyle="yellow";
-ctx.fillRect(b.x,b.y,8,4);
-zombies.forEach((z,zi)=>{
-if(b.x>z.x && b.x<z.x+40){
-z.hp-=save.damage;
-bullets.splice(i,1);
-if(z.hp<=0){
-zombies.splice(zi,1);
-save.coins+=5;
-wave++;
-nextWave();
+ctx.fillRect(b.x,b.y,10,5);
+
+zombies.forEach((z)=>{
+if(!z.dead && b.x>z.x && b.x<z.x+40){
+z.hp-=5;
+if(z.hp<=0){z.dead=true;coins+=1;}
 }
-}
-});
 });
 
-/* Zombies */
+if(boss && !boss.dead && b.x>boss.x && b.x<boss.x+80){
+boss.hp-=5;
+if(boss.hp<=0){boss.dead=true;coins+=10;}
+}
+});
+
+/* zombies */
 zombies.forEach((z,i)=>{
-let speed=2;
-if(z.type==="fast")speed=4;
-if(z.type==="tank")speed=1.5;
-if(z.type==="boom")speed=3;
-z.x-=speed;
-
-ctx.fillStyle=
-z.type==="fast"?"cyan":
-z.type==="tank"?"purple":
-z.type==="boom"?"orange":"green";
-
-ctx.fillRect(z.x,z.y,40,40);
-
-if(z.x<player.x+40){
-player.hp-=2;
-shake=10;
-damageFlash=5;
-zombies.splice(i,1);
-}
+if(!z.dead)z.x-=2;
+drawZombie(z);
 });
 
-/* Effects */
-if(damageFlash>0){
-ctx.fillStyle="rgba(255,0,0,0.3)";
-ctx.fillRect(0,0,900,500);
-damageFlash--;
-}
-shake*=0.9;
-
-ui.innerHTML=`❤️ ${player.hp} | 💰 ${save.coins} | 🌊 Wave ${wave} | ⚡ ${ultReady?"READY":"..."}`;
-
-if(player.hp<=0){
-gameRunning=false;
-menu.style.display="block";
+/* boss */
+if(boss){
+if(!boss.dead)boss.x-=1.5;
+drawBoss(boss);
 }
 
-ctx.restore();
+document.getElementById("ui").innerHTML=
+"❤️ "+player.hp+
+" | 💰 "+coins+
+" | 🌊 Wave "+wave;
+
 requestAnimationFrame(update);
 }
 </script>
