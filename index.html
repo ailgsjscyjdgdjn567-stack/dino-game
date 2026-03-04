@@ -3,25 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dino Galaxy 2.0</title>
+<title>Dino Galaxy</title>
 <style>
-body{margin:0;overflow:hidden;background:black;font-family:Arial}
+body{margin:0;overflow:hidden;background:black;font-family:Arial;color:white}
 canvas{display:block;margin:auto}
-#ui{position:absolute;top:10px;left:10px;color:white}
-#ultBtn{
+button{
 position:absolute;
-bottom:20px;
-right:20px;
-padding:15px;
-font-size:18px;
+padding:12px 16px;
+border:none;
+border-radius:12px;
+background:#222;
+color:white;
+font-size:14px;
+box-shadow:0 0 8px rgba(255,255,255,0.4);
 }
+#jumpBtn{bottom:20px;left:20px}
+#shootBtn{bottom:20px;right:20px}
+#ultBtn{bottom:90px;right:20px}
+#shopBtn{top:10px;right:10px}
+#shop{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:rgba(0,0,0,0.95);
+padding:20px;
+border-radius:15px;
+display:none;
+}
+#menu,#gameOver{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:rgba(0,0,0,0.9);
+padding:30px;
+border-radius:20px;
+text-align:center;
+}
+#gameOver{display:none}
+#ui{position:absolute;top:10px;left:10px}
 </style>
 </head>
 <body>
 
+<div id="menu">
+<h1>🦖 DINO GALAXY</h1>
+<button onclick="startGame()">START</button>
+</div>
+
+<div id="gameOver">
+<h1>💀 GAME OVER</h1>
+<button onclick="restart()">RESTART</button>
+</div>
+
+<div id="shop"></div>
 <div id="ui"></div>
-<button id="ultBtn">⚡ ULT</button>
-<canvas id="game" width="900" height="500"></canvas>
+
+<button id="jumpBtn" style="display:none">⬆</button>
+<button id="shootBtn" style="display:none">🔫</button>
+<button id="ultBtn" style="display:none">⚡</button>
+<button id="shopBtn" style="display:none">SHOP</button>
+
+<canvas id="game" width="900" height="500" style="display:none"></canvas>
 
 <script>
 const canvas=document.getElementById("game");
@@ -31,107 +75,133 @@ let ground=420;
 let score=0;
 let coins=0;
 let level=1;
-let lives=5;
-
-let player={x:100,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true,color:"lime"};
-
-let zombies=[];
-let bullets=[];
-let particles=[];
-let stars=[];
-let planets=[];
-let boss=null;
+let lives=15;
+let gameRunning=false;
 let ultReady=true;
 
-/* ===== ЗВЁЗДЫ ===== */
-for(let i=0;i<100;i++){
-stars.push({x:Math.random()*900,y:Math.random()*500,s:Math.random()*2});
+let weaponDamage=5;
+let shootFlash=0;
+let recoil=0;
+let playerColor="#32cd32";
+let legendary=false;
+
+let player={x:100,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true,frame:0};
+let zombies=[];
+let bullets=[];
+let boss=null;
+let fireballs=[];
+let particles=[];
+
+const planets=[
+["#000010","#000033"],
+["#1a002a","#330066"],
+["#002a1a","#004d33"],
+["#2a0000","#660000"],
+["#001a33","#003366"]
+];
+
+function startGame(){
+menu.style.display="none";
+canvas.style.display="block";
+jumpBtn.style.display="block";
+shootBtn.style.display="block";
+ultBtn.style.display="block";
+shopBtn.style.display="block";
+gameRunning=true;
+update();
 }
 
-/* ===== ПЛАНЕТЫ ===== */
-for(let i=0;i<3;i++){
-planets.push({x:Math.random()*900,y:Math.random()*200,r:30+Math.random()*40});
+function restart(){location.reload();}
+
+/* ===== SHOP ===== */
+shopBtn.onclick=()=>{
+shop.style.display="block";
+shop.innerHTML=
+"<h3>SHOP</h3>"+
+"💰 "+coins+"<br><br>"+
+"<button onclick='buyWeapon(7)'>АК-47 (10)</button><br>"+
+"<button onclick='buyWeapon(10)'>Гранатомёт (10)</button><br>"+
+"<button onclick='buyLegendary()'>🌈 Легендарный (20)</button><br>"+
+"<button onclick='closeShop()'>Закрыть</button>";
+};
+
+function closeShop(){shop.style.display="none";}
+
+function buyWeapon(dmg){
+if(coins>=10){
+coins-=10;
+weaponDamage=dmg;
+}
 }
 
-/* ===== СПАВН ===== */
-function spawnZombie(){
-zombies.push({x:900,y:ground-60,hp:10+level});
+function buyLegendary(){
+if(coins>=20){
+coins-=20;
+legendary=true;
 }
-setInterval(spawnZombie,2000);
-
-function spawnBoss(){
-boss={x:900,y:ground-150,hp:50+level*10};
 }
 
-/* ===== СТРЕЛЬБА ===== */
-function shoot(){
-bullets.push({x:player.x+50,y:player.y+20,explosive:false});
-}
-
-document.addEventListener("keydown",e=>{
-if(e.code==="Space" && player.grounded){
+/* ===== BUTTONS ===== */
+jumpBtn.onclick=()=>{
+if(player.grounded){
 player.vy=player.jump;
 player.grounded=false;
 }
-if(e.code==="KeyF") shoot();
-});
-
-/* ===== УЛЬТА ===== */
-document.getElementById("ultBtn").onclick=()=>{
-if(!ultReady) return;
-ultReady=false;
-
-zombies=[];
-if(boss) boss.hp-=40;
-
-for(let i=0;i<50;i++){
-particles.push({
-x:450,y:250,
-vx:(Math.random()-0.5)*10,
-vy:(Math.random()-0.5)*10,
-life:50
-});
-}
-
-setTimeout(()=>ultReady=true,10000);
 };
 
-/* ===== ЧАСТИЦЫ ===== */
-function createExplosion(x,y){
-for(let i=0;i<20;i++){
+shootBtn.onclick=()=>{
+bullets.push({x:player.x+75,y:player.y+21});
+shootFlash=5;
+recoil=5;
+};
+
+ultBtn.onclick=()=>{
+if(!ultReady)return;
+ultReady=false;
+zombies=[];
+if(boss)boss.hp-=40;
+setTimeout(()=>ultReady=true,8000);
+};
+
+/* ===== SPAWN ===== */
+setInterval(()=>{
+if(gameRunning)
+zombies.push({x:900,y:ground-60,hp:9+level});
+},2000);
+
+function spawnBoss(){
+boss={
+x:900,
+y:ground-150,
+hp:80+level*20,
+phase:1
+};
+}
+
+function explosion(x,y){
+for(let i=0;i<25;i++){
 particles.push({
 x:x,y:y,
 vx:(Math.random()-0.5)*6,
 vy:(Math.random()-0.5)*6,
-life:30
+life:40
 });
 }
 }
 
-/* ===== ОБНОВЛЕНИЕ ===== */
+/* ===== UPDATE ===== */
 function update(){
-ctx.fillStyle="black";
+if(!gameRunning)return;
+
+/* BACKGROUND */
+let p=planets[level%planets.length];
+let grad=ctx.createLinearGradient(0,0,0,500);
+grad.addColorStop(0,p[0]);
+grad.addColorStop(1,p[1]);
+ctx.fillStyle=grad;
 ctx.fillRect(0,0,900,500);
 
-/* ЗВЁЗДЫ */
-ctx.fillStyle="white";
-stars.forEach(s=>{
-s.x-=0.5;
-if(s.x<0)s.x=900;
-ctx.fillRect(s.x,s.y,s.s,s.s);
-});
-
-/* ПЛАНЕТЫ */
-planets.forEach(p=>{
-p.x-=0.2;
-if(p.x<-50)p.x=950;
-ctx.fillStyle="purple";
-ctx.beginPath();
-ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-ctx.fill();
-});
-
-/* ИГРОК */
+/* PLAYER */
 player.vy+=player.gravity;
 player.y+=player.vy;
 if(player.y>=ground-60){
@@ -140,20 +210,77 @@ player.vy=0;
 player.grounded=true;
 }
 
-ctx.fillStyle=player.color;
-ctx.fillRect(player.x,player.y,50,40);
-ctx.fillRect(player.x+40,player.y-20,30,30);
+player.frame+=0.15;
 
-/* ПУЛИ */
-bullets.forEach((b,i)=>{
-b.x+=10;
+if(legendary){
+let r=Math.floor(128+128*Math.sin(player.frame));
+let g=Math.floor(128+128*Math.sin(player.frame+2));
+let b=Math.floor(128+128*Math.sin(player.frame+4));
+playerColor=`rgb(${r},${g},${b})`;
+}
+
+/* Tail */
+ctx.fillStyle=playerColor;
+ctx.beginPath();
+ctx.moveTo(player.x-20,player.y+20);
+ctx.lineTo(player.x,player.y+10);
+ctx.lineTo(player.x,player.y+35);
+ctx.fill();
+
+/* Body */
+ctx.fillRect(player.x-recoil,player.y,50,40);
+
+/* Head */
+ctx.beginPath();
+ctx.arc(player.x+45-recoil,player.y+10,15,0,Math.PI*2);
+ctx.fill();
+
+/* Eye */
+ctx.fillStyle="white";
+ctx.beginPath();
+ctx.arc(player.x+50-recoil,player.y+8,4,0,Math.PI*2);
+ctx.fill();
+
+ctx.fillStyle="black";
+ctx.beginPath();
+ctx.arc(player.x+52-recoil,player.y+8,2,0,Math.PI*2);
+ctx.fill();
+
+/* Legs */
+let legMove=Math.sin(player.frame)*6;
+ctx.fillStyle="#1f7a1f";
+ctx.fillRect(player.x+10,player.y+40,8,20+legMove);
+ctx.fillRect(player.x+30,player.y+40,8,20-legMove);
+
+/* Arm */
+ctx.fillStyle=playerColor;
+ctx.fillRect(player.x+40-recoil,player.y+20,15,8);
+
+/* Gun */
+ctx.fillStyle="black";
+ctx.fillRect(player.x+55-recoil,player.y+18,18,6);
+ctx.fillRect(player.x+60-recoil,player.y+24,6,10);
+
+/* Flash */
+if(shootFlash>0){
 ctx.fillStyle="yellow";
-ctx.fillRect(b.x,b.y,10,5);
+ctx.beginPath();
+ctx.arc(player.x+80,player.y+21,8,0,Math.PI*2);
+ctx.fill();
+shootFlash--;
+}
+if(recoil>0)recoil-=0.5;
+
+/* BULLETS */
+bullets.forEach((b,i)=>{
+b.x+=12;
+ctx.fillStyle="yellow";
+ctx.fillRect(b.x,b.y,8,4);
 
 zombies.forEach((z,zi)=>{
 if(b.x>z.x && b.x<z.x+40){
-z.hp-=5;
-createExplosion(z.x,z.y);
+z.hp-=weaponDamage;
+explosion(z.x,z.y);
 bullets.splice(i,1);
 if(z.hp<=0){
 zombies.splice(zi,1);
@@ -163,69 +290,77 @@ coins++;
 }
 });
 
-if(boss && b.x>boss.x-60 && b.x<boss.x+60){
-boss.hp-=5;
-createExplosion(boss.x,boss.y);
+if(boss && b.x>boss.x && b.x<boss.x+140){
+boss.hp-=weaponDamage;
 bullets.splice(i,1);
-if(boss.hp<=0){
-coins+=10;
-level++;
-boss=null;
-}
 }
 });
 
-/* ЗОМБИ */
+/* ZOMBIES */
 zombies.forEach((z,i)=>{
-z.x-=2+level*0.3;
+z.x-=2+level*0.5;
 ctx.fillStyle="green";
 ctx.fillRect(z.x,z.y,40,60);
-
 if(z.x<player.x+40){
 lives--;
 zombies.splice(i,1);
 }
 });
 
-/* БОСС */
-if(score>0 && score%20===0 && !boss){
-spawnBoss();
-}
+/* BOSS */
+if(score>=30 && !boss)spawnBoss();
 
 if(boss){
-boss.x-=1.5;
-ctx.fillStyle="red";
-ctx.beginPath();
-ctx.arc(boss.x,boss.y,60,0,Math.PI*2);
-ctx.fill();
+boss.x-=1;
+if(boss.hp<40)boss.phase=2;
+
+ctx.fillStyle=boss.phase===1?"darkred":"purple";
+ctx.fillRect(boss.x,boss.y,140,90);
+
+if(Math.random()<0.03*boss.phase){
+fireballs.push({x:boss.x,y:boss.y+40});
 }
 
-/* ЧАСТИЦЫ */
+if(boss.hp<=0){
+coins+=30;
+level++;
+boss=null;
+}
+}
+
+/* FIRE */
+fireballs.forEach((f,i)=>{
+f.x-=6;
+ctx.fillStyle="orange";
+ctx.beginPath();
+ctx.arc(f.x,f.y,10,0,Math.PI*2);
+ctx.fill();
+if(f.x<player.x+40 && f.x>player.x){
+lives--;
+fireballs.splice(i,1);
+}
+});
+
+/* PARTICLES */
 particles.forEach((p,i)=>{
 p.x+=p.vx;
 p.y+=p.vy;
 p.life--;
 ctx.fillStyle="orange";
-ctx.fillRect(p.x,p.y,4,4);
-if(p.life<=0) particles.splice(i,1);
+ctx.fillRect(p.x,p.y,3,3);
+if(p.life<=0)particles.splice(i,1);
 });
 
 /* UI */
-document.getElementById("ui").innerHTML=
-"🏆 "+score+
-" ❤️ "+lives+
-" 💰 "+coins+
-" 🌍 "+level+
-" ⚡ "+(ultReady?"READY":"...");
+ui.innerHTML="🏆 "+score+" ❤️ "+lives+" 💰 "+coins+" 🌍 "+level+" ⚡ "+(ultReady?"READY":"...");
 
 if(lives<=0){
-alert("GAME OVER");
-location.reload();
+gameRunning=false;
+gameOver.style.display="block";
 }
 
 requestAnimationFrame(update);
 }
-update();
 </script>
 </body>
 </html>
