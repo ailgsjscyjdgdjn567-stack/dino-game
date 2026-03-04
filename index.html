@@ -3,261 +3,271 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Deep Miner Tycoon</title>
+    <title>Sky Disaster Simulator</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; color: white; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
-
-        /* Интерфейс */
-        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
-        .btn { padding: 15px 40px; margin: 10px; font-size: 18px; cursor: pointer; background: #34495e; color: white; border: 2px solid #ecf0f1; border-radius: 8px; min-width: 200px; }
         
-        #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; pointer-events: none; display: none; border: 1px solid #555; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-        .shop-area { pointer-events: auto; margin-top: 10px; }
-        .shop-btn { background: #27ae60; border: none; color: white; padding: 10px; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 5px; font-weight: bold; transition: 0.2s; }
-        .shop-btn:active { transform: scale(0.95); }
+        #ui-layer { position: absolute; inset: 0; pointer-events: none; color: white; }
+        .panel { position: absolute; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px; pointer-events: auto; border: 1px solid #444; }
+        
+        /* Панель катастроф */
+        #disaster-panel { top: 10px; right: 10px; width: 180px; }
+        .dis-btn { width: 100%; background: #c0392b; color: white; border: none; padding: 8px; margin-bottom: 5px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .dis-btn:hover { background: #ff4757; }
+        
+        /* Телеметрия */
+        #stats { top: 10px; left: 10px; }
+        #passengers { bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; text-align: center; }
+        
+        /* Джойстик для мобилок */
+        #joystick-wrapper { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; display: none; pointer-events: auto; }
+        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; opacity: 0.5; }
 
-        /* Уведомления */
-        #msg-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; font-size: 36px; display: none; text-shadow: 3px 3px 0px #000; pointer-events: none; z-index: 10; text-align: center; }
-
-        /* Мобильное управление */
-        #mobile-controls { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: space-between; padding: 0 20px; box-sizing: border-box; }
-        .m-group { display: flex; gap: 12px; align-items: flex-end; }
-        .m-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; user-select: none; border: 1px solid rgba(255,255,255,0.3); -webkit-tap-highlight-color: transparent; }
-
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; opacity: 0.6; }
-        .depth-info { font-size: 14px; color: #bdc3c7; margin-bottom: 5px; }
+        #game-over { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 40px; border-radius: 20px; text-align: center; display: none; pointer-events: auto; border: 2px solid #e74c3c; }
+        .retry-btn { background: #27ae60; color: white; padding: 15px 30px; border: none; border-radius: 8px; font-size: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="overlay">
-    <h1>3D DEEP MINER</h1>
-    <p>Чем глубже — тем дороже руда!</p>
-    <div id="menu-device">
-        <button class="btn" onclick="initGame('pc')">💻 ИГРАТЬ (ПК)</button>
-        <button class="btn" onclick="initGame('mobile')">📱 ИГРАТЬ (ТЕЛЕФОН)</button>
+<div id="ui-layer">
+    <div id="stats" class="panel">
+        Высота: <span id="alt">0</span> м<br>
+        Скорость: <span id="spd">0</span> км/ч
+    </div>
+
+    <div id="disaster-panel" class="panel">
+        <div style="color: #f1c40f; font-weight: bold; margin-bottom: 10px; text-align: center;">🚨 КАТАСТРОФЫ</div>
+        <button class="dis-btn" onclick="trigger('engine')">Отказ двигателя</button>
+        <button class="dis-btn" onclick="trigger('fire')">Пожар на борту</button>
+        <button class="dis-btn" onclick="trigger('wing')">Разрушение крыла</button>
+        <button class="dis-btn" onclick="trigger('lightning')">Удар молнии</button>
+        <button class="dis-btn" onclick="trigger('alien')">НЛО / Похищение</button>
+    </div>
+
+    <div id="passengers" class="panel">
+        👥 Статус: <span id="p-status" style="color: #2ecc71;">Спокойны</span>
+        <div id="p-scream" style="color: #ff4757; font-weight: bold; height: 20px;"></div>
+    </div>
+
+    <div id="joystick-wrapper"><div id="joystick-stick"></div></div>
+
+    <div id="game-over">
+        <h1 id="death-reason" style="color: #e74c3c;">САМОЛЕТ УНИЧТОЖЕН</h1>
+        <p id="death-desc"></p>
+        <button class="retry-btn" onclick="location.reload()">НОВЫЙ РЕЙС</button>
     </div>
 </div>
 
-<div id="ui">
-    <div class="depth-info">Глубина: <span id="depth-val">0</span>м</div>
-    <div style="font-size: 20px;">💰 $<span id="money" style="color:#f1c40f">0</span></div>
-    <div style="margin-bottom: 5px;">🎒 <span id="bag">0</span> / <span id="maxBag">3</span></div>
-    <div style="font-size: 14px;">Инструмент: <span id="tool-name" style="color:#3498db">Лопата</span></div>
-    <div class="shop-area">
-        <button class="shop-btn" onclick="sellAll()">ПРОДАТЬ ВСЁ (F)</button>
-        <button id="upgrade-btn" class="shop-btn" onclick="buyUpgrade()">+МЕСТО ($200)</button>
-    </div>
-</div>
+<script>
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+document.body.appendChild(canvas);
 
-<div id="msg-center"></div>
-<div id="crosshair"></div>
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.onresize = resize;
+resize();
 
-<div id="mobile-controls">
-    <div class="m-group"><div class="m-btn" id="m-up">⬆️</div></div>
-    <div class="m-group">
-        <div class="m-btn" id="m-jump" style="background:rgba(52, 152, 219, 0.4)">🚀</div>
-        <div class="m-btn" onclick="sellAll()" style="background:rgba(46, 204, 113, 0.4)">💰</div>
-        <div class="m-btn" onclick="toggleTool()">🔄</div>
-        <div class="m-btn" id="dig-btn" style="background:rgba(231, 76, 60, 0.4)">⛏️</div>
-    </div>
-</div>
+// --- Настройки ---
+let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+if(isMobile) document.getElementById('joystick-wrapper').style.display = 'block';
 
-<script type="module">
-    import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
-    import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/PointerLockControls.js';
+let plane = {
+    x: 300, y: canvas.height/2,
+    angle: 0, speed: 5, targetAngle: 0,
+    broken: false, fire: false, wingLost: false,
+    parts: [], screamTimer: 0
+};
 
-    // --- ПЕРЕМЕННЫЕ ---
-    let state = { money: 0, bag: 0, maxBag: 3, tool: 'shovel', bagLvl: 1, isMobile: false, inventory: [] };
-    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-    let velocity = new THREE.Vector3();
-    let canJump = false;
+let mouse = { x: 300, y: canvas.height/2 };
+let joy = { x: 0, y: 0, active: false };
+let worldX = 0;
+let time = 0;
 
-    // --- ЦЕНЫ РУДЫ ---
-    const ORE_VALUES = { dirt: 10, stone: 20, iron: 50, gold: 150, diamond: 500 };
+// --- Управление ---
+window.onmousemove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; };
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050505);
-    scene.fog = new THREE.FogExp2(0x050505, 0.15);
+const joyWrapper = document.getElementById('joystick-wrapper');
+const joyStick = document.getElementById('joystick-stick');
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+joyWrapper.ontouchmove = (e) => {
+    e.preventDefault();
+    let rect = joyWrapper.getBoundingClientRect();
+    let touch = e.touches[0];
+    let tx = touch.clientX - rect.left - 60;
+    let ty = touch.clientY - rect.top - 60;
+    let dist = Math.sqrt(tx*tx + ty*ty);
+    if(dist > 50) { tx *= 50/dist; ty *= 50/dist; }
+    joyStick.style.transform = `translate(${tx}px, ${ty}px)`;
+    joy.x = tx/50; joy.y = ty/50; joy.active = true;
+};
+joyWrapper.ontouchend = () => {
+    joyStick.style.transform = `translate(0, 0)`;
+    joy.active = false;
+};
 
-    // Свет вокруг игрока
-    const pointLight = new THREE.PointLight(0xffffff, 1.5, 6);
-    scene.add(pointLight);
-    scene.add(new THREE.AmbientLight(0x222222));
+// --- Функции ---
+function trigger(type) {
+    if(plane.broken) return;
+    plane.broken = true;
+    let reason = "";
+    
+    if(type === 'engine') { reason = "Двигатели заглохли!"; plane.speed = 2; }
+    if(type === 'fire') { reason = "Пожар в хвосте!"; plane.fire = true; }
+    if(type === 'wing') { reason = "Левое крыло оторвано!"; plane.wingLost = true; }
+    if(type === 'lightning') { reason = "Прямое попадание молнии!"; }
+    if(type === 'alien') { reason = "НЛО разрезал корпус!"; }
 
-    const blocks = [];
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    document.getElementById('p-status').innerText = "ПАНИКА!!!";
+    document.getElementById('p-status').style.color = "red";
+    document.getElementById('game-over').style.display = 'block';
+    document.getElementById('death-desc').innerText = reason;
+}
 
-    function createWorld() {
-        for(let x = -6; x <= 6; x++) {
-            for(let z = -6; z <= 6; z++) {
-                for(let y = 0; y > -20; y--) {
-                    let type = 'dirt', color = 0x6d4c41;
-
-                    if (y === 0) color = 0x27ae60;
-                    else if (y < -3 && y >= -7) { type = 'stone'; color = 0x7f8c8d; }
-                    else if (y < -7) { type = 'stone'; color = 0x3d3d3d; } // Глубокий сланец
-
-                    // Генерация руд
-                    let rand = Math.random();
-                    if (y < -2 && y > -6 && rand > 0.96) { type = 'iron'; color = 0xd7ccc8; }
-                    if (y < -6 && y > -12 && rand > 0.95) { type = 'gold'; color = 0xf1c40f; }
-                    if (y < -12 && rand > 0.94) { type = 'diamond'; color = 0x00e5ff; }
-
-                    const mat = new THREE.MeshStandardMaterial({ color: color });
-                    const cube = new THREE.Mesh(geometry, mat);
-                    cube.position.set(x, y, z);
-                    cube.userData = { type: type };
-                    scene.add(cube);
-                    blocks.push(cube);
-                }
-            }
+function update() {
+    if(!plane.broken) {
+        if(!isMobile) {
+            let dx = mouse.x - plane.x;
+            let dy = mouse.y - plane.y;
+            plane.targetAngle = Math.atan2(dy, dx);
+            plane.speed = Math.min(10, Math.sqrt(dx*dx + dy*dy) / 20);
+        } else if(joy.active) {
+            plane.targetAngle = Math.atan2(joy.y, joy.x);
+            plane.speed = 8;
         }
+
+        // Плавный поворот
+        let diff = plane.targetAngle - plane.angle;
+        while(diff < -Math.PI) diff += Math.PI*2;
+        while(diff > Math.PI) diff -= Math.PI*2;
+        plane.angle += diff * 0.05;
+
+        plane.y += Math.sin(plane.angle) * plane.speed;
+        worldX += Math.cos(plane.angle) * plane.speed;
+
+        // Лимит космоса
+        if(plane.y < -500) trigger('space');
+        // Земля
+        if(plane.y > canvas.height - 80) {
+            if(plane.speed > 3) trigger('crash');
+            else plane.y = canvas.height - 80;
+        }
+    } else {
+        plane.y += 5; // Падение
+        plane.angle += 0.1;
+        plane.speed *= 0.95;
     }
-    createWorld();
 
-    const controls = new PointerLockControls(camera, document.body);
-
-    window.initGame = (mode) => {
-        state.isMobile = (mode === 'mobile');
-        document.getElementById('overlay').style.display = 'none';
-        document.getElementById('ui').style.display = 'block';
-        if(!state.isMobile) { controls.lock(); document.getElementById('crosshair').style.display = 'block'; }
-        else { document.getElementById('mobile-controls').style.display = 'flex'; }
-    };
-
-    document.addEventListener('keydown', (e) => {
-        if(e.code === 'KeyW') moveForward = true;
-        if(e.code === 'KeyS') moveBackward = true;
-        if(e.code === 'KeyA') moveLeft = true;
-        if(e.code === 'KeyD') moveRight = true;
-        if(e.code === 'KeyF') sellAll();
-        if(e.code === 'Space' && canJump) { velocity.y += 5.5; canJump = false; }
-        if(e.code === 'Digit1') setTool('shovel');
-        if(e.code === 'Digit2') setTool('pickaxe');
-    });
-    document.addEventListener('keyup', (e) => {
-        if(e.code === 'KeyW') moveForward = false;
-        if(e.code === 'KeyS') moveBackward = false;
-        if(e.code === 'KeyA') moveLeft = false;
-        if(e.code === 'KeyD') moveRight = false;
-    });
-
-    document.getElementById('m-up').ontouchstart = (e) => { e.preventDefault(); moveForward = true; };
-    document.getElementById('m-up').ontouchend = () => moveForward = false;
-    document.getElementById('m-jump').ontouchstart = (e) => { e.preventDefault(); if(canJump) { velocity.y += 5.5; canJump = false; }};
-
-    function setTool(t) {
-        state.tool = t;
-        document.getElementById('tool-name').innerText = t === 'shovel' ? 'Лопата' : 'Кирка';
-        document.getElementById('tool-name').style.color = t === 'shovel' ? '#3498db' : '#e67e22';
-    }
-    window.toggleTool = () => setTool(state.tool === 'shovel' ? 'pickaxe' : 'shovel');
-
-    const raycaster = new THREE.Raycaster();
-    function dig() {
-        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-        const hits = raycaster.intersectObjects(blocks);
-        if(hits.length > 0 && hits[0].distance < 3.5) {
-            if(state.bag >= state.maxBag) { showCenterMsg("СУМКА ПОЛНА!", "#ff4757"); return; }
-            
-            const obj = hits[0].object;
-            const type = obj.userData.type;
-            const isDirt = (type === 'dirt');
-            
-            if((isDirt && state.tool === 'shovel') || (!isDirt && state.tool === 'pickaxe')) {
-                scene.remove(obj);
-                blocks.splice(blocks.indexOf(obj), 1);
-                state.bag++;
-                state.inventory.push(type);
-                updateUI();
-            }
+    // Пассажиры кричат
+    if(plane.broken || plane.y < 100 || plane.y > canvas.height - 200) {
+        plane.screamTimer++;
+        if(plane.screamTimer % 30 === 0) {
+            const screams = ["ААААА!", "МЫ ПАДАЕМ!", "ГДЕ ПАРАШЮТ?!", "ГОСПОДИ!", "МАМА!"];
+            document.getElementById('p-scream').innerText = screams[Math.floor(Math.random()*screams.length)];
         }
     }
 
-    window.sellAll = () => {
-        if(state.bag === 0) return;
-        let total = 0;
-        state.inventory.forEach(item => { total += ORE_VALUES[item] || 10; });
-        state.money += total;
-        state.bag = 0;
-        state.inventory = [];
-        showCenterMsg(`+$${total}`, "#2ecc71");
-        updateUI();
-    };
+    time += 0.002;
+    draw();
+    requestAnimationFrame(update);
+}
 
-    window.buyUpgrade = () => {
-        let cost = state.bagLvl * 200;
-        if(state.money >= cost) { state.money -= cost; state.maxBag += 3; state.bagLvl++; updateUI(); }
-        else { showCenterMsg(`НУЖНО $${cost}`, "#e74c3c"); }
-    };
+function draw() {
+    // 1. Небо
+    let altFactor = Math.max(0, 1 - (plane.y + 500) / 1500);
+    let dayNight = (Math.sin(time) + 1) / 2;
+    
+    let r = Math.floor(100 * (1-altFactor) * (1-dayNight));
+    let g = Math.floor(180 * (1-altFactor) * (1-dayNight));
+    let b = Math.floor(255 * (1-altFactor));
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(0,0,canvas.width, canvas.height);
 
-    function updateUI() {
-        document.getElementById('money').innerText = state.money;
-        document.getElementById('bag').innerText = state.bag;
-        document.getElementById('maxBag').innerText = state.maxBag;
-        document.getElementById('upgrade-btn').innerText = `+МЕСТО ($${state.bagLvl * 200})`;
-        document.getElementById('depth-val').innerText = Math.abs(Math.floor(camera.position.y - 1.6));
+    // 2. Светила
+    ctx.fillStyle = dayNight > 0.5 ? "#eee" : "#f1c40f";
+    ctx.beginPath();
+    ctx.arc(canvas.width - 150, 150 + Math.cos(time)*100, 40, 0, Math.PI*2);
+    ctx.fill();
+
+    // 3. Облака (Параллакс)
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    for(let i=0; i<8; i++) {
+        let cx = (i * 500 - worldX * 0.3) % (canvas.width + 400);
+        if(cx < -200) cx += canvas.width + 400;
+        ctx.beginPath();
+        ctx.arc(cx, 100 + i*80, 40, 0, Math.PI*2);
+        ctx.arc(cx+40, 100 + i*80, 50, 0, Math.PI*2);
+        ctx.fill();
     }
 
-    function showCenterMsg(text, color) {
-        const m = document.getElementById('msg-center');
-        m.innerText = text; m.style.color = color; m.style.display = 'block';
-        setTimeout(() => m.style.display = 'none', 1000);
-    }
-
-    document.addEventListener('mousedown', () => { if(controls.isLocked) dig(); });
-    document.getElementById('dig-btn').ontouchstart = (e) => { e.preventDefault(); dig(); };
-
-    let prevTime = performance.now();
-    function animate() {
-        requestAnimationFrame(animate);
-        const time = performance.now();
-        const delta = (time - prevTime) / 1000;
-
-        if (controls.isLocked || state.isMobile) {
-            velocity.y -= 16.0 * delta; 
-            velocity.x -= velocity.x * 10.0 * delta;
-            velocity.z -= velocity.z * 10.0 * delta;
-
-            let dir = new THREE.Vector3();
-            dir.z = Number(moveForward) - Number(moveBackward);
-            dir.x = Number(moveRight) - Number(moveLeft);
-            dir.normalize();
-
-            if (moveForward || moveBackward) velocity.z -= dir.z * 50.0 * delta;
-            if (moveLeft || moveRight) velocity.x -= dir.x * 50.0 * delta;
-
-            controls.moveRight(-velocity.x * delta);
-            controls.moveForward(-velocity.z * delta);
-            camera.position.y += (velocity.y * delta);
-            
-            // Свет следует за камерой
-            pointLight.position.copy(camera.position);
-
-            let p = camera.position;
-            canJump = false;
-            for(let b of blocks) {
-                if(Math.abs(p.x - b.position.x) < 0.7 && Math.abs(p.z - b.position.z) < 0.7) {
-                    if(p.y < b.position.y + 1.6 && p.y > b.position.y + 0.5) {
-                        p.y = b.position.y + 1.6; velocity.y = 0; canJump = true; break;
-                    }
-                }
-            }
-            if(p.y < -50) p.set(0, 5, 0);
-            if(time % 500 < 20) updateUI(); // Обновляем глубину
+    // 4. Земля и города
+    ctx.fillStyle = "#1e3799"; // Горизонт
+    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    
+    for(let i=0; i<15; i++) {
+        let gx = (i * 250 - worldX) % (canvas.width + 500);
+        if(gx < -250) gx += canvas.width + 500;
+        
+        // Здания
+        ctx.fillStyle = "#2f3542";
+        ctx.fillRect(gx, canvas.height - 180, 60, 80);
+        ctx.fillStyle = "#f1c40f";
+        ctx.fillRect(gx+10, canvas.height-170, 10, 10); // Окна
+        
+        // Машины
+        ctx.fillStyle = "red";
+        ctx.fillRect(gx + (time*1000 % 200), canvas.height - 40, 15, 8);
+        
+        // Аэропорт
+        if(i % 7 === 0) {
+            ctx.fillStyle = "#57606f";
+            ctx.fillRect(gx+100, canvas.height - 105, 300, 10);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 12px Arial";
+            ctx.fillText("AIRPORT - LAND HERE", gx+150, canvas.height - 115);
         }
-        prevTime = time;
-        renderer.render(scene, camera);
     }
-    camera.position.set(0, 2, 0);
-    animate();
+
+    // 5. Самолет
+    ctx.save();
+    ctx.translate(plane.x, plane.y);
+    ctx.rotate(plane.angle);
+    
+    // Эффекты
+    if(plane.fire) {
+        ctx.fillStyle = "orange";
+        ctx.beginPath(); ctx.arc(-30, 0, 15 + Math.random()*10, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Корпус
+    ctx.fillStyle = "#f1f2f6";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 40, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+    
+    // Крылья
+    if(!plane.wingLost) {
+        ctx.fillStyle = "#ced6e0";
+        ctx.fillRect(-10, -30, 15, 60);
+    }
+    
+    // Кабина
+    ctx.fillStyle = "#2f3542";
+    ctx.beginPath();
+    ctx.arc(25, -2, 8, 0, Math.PI*2);
+    ctx.fill();
+    
+    ctx.restore();
+
+    // UI
+    document.getElementById('alt').innerText = Math.floor(Math.max(0, (canvas.height - 100 - plane.y)));
+    document.getElementById('spd').innerText = Math.floor(plane.speed * 45);
+}
+
+update();
 </script>
 </body>
 </html>
