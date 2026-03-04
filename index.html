@@ -2,292 +2,235 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dino Galaxy Ultimate</title>
-
+<title>Dino Galaxy 2.0</title>
 <style>
 body{margin:0;overflow:hidden;background:black;font-family:Arial;color:white}
 canvas{display:block;margin:auto}
-
-/* КНОПКИ */
-button{
-position:absolute;
-padding:14px 18px;
-border:none;
-border-radius:12px;
-background:#222;
-color:white;
-font-size:16px;
-cursor:pointer;
-box-shadow:0 0 10px rgba(255,255,255,0.4);
-}
-
-#jumpBtn{bottom:20px;left:20px;display:none}
-#shootBtn{bottom:20px;right:20px;display:none}
-#ultBtn{bottom:90px;right:20px;display:none}
-#shopBtn{top:15px;right:15px;display:none}
-
-/* МЕНЮ */
-#menu,#gameOver{
-position:absolute;
-top:50%;left:50%;
+#menu,#shop{
+position:absolute;top:50%;left:50%;
 transform:translate(-50%,-50%);
-background:rgba(0,0,0,0.95);
-padding:30px;
-border-radius:20px;
-text-align:center;
-width:340px;
+background:#111;padding:30px;border-radius:20px;
+text-align:center;z-index:10;
 }
-
-#gameOver{display:none}
+button{padding:10px 15px;margin:5px;border:none;border-radius:10px;background:#222;color:white;cursor:pointer}
 #ui{position:absolute;top:10px;left:10px}
-
-/* БОЛЬШОЙ МАГАЗИН */
-#shop{
-position:absolute;
-top:50%;left:50%;
-transform:translate(-50%,-50%);
-width:650px;
-height:500px;
-background:rgba(0,0,0,0.98);
-border-radius:25px;
-padding:25px;
-display:none;
-z-index:20;
-overflow:auto;
-box-shadow:0 0 35px rgba(0,255,0,0.7);
-text-align:center;
-}
-
-.shopMainBtn{
-position:relative;
-width:45%;
-margin:10px 2%;
-padding:15px;
-background:#111;
-border-radius:15px;
-display:inline-block;
-font-size:20px;
-}
-
-.shopItem{
-position:relative;
-display:block;
-width:100%;
-margin:8px 0;
-padding:12px;
-background:#111;
-border-radius:12px;
-}
 </style>
 </head>
 <body>
 
 <div id="menu">
-<h1>🦖 DINO GALAXY</h1>
-<button onclick="startGame()">PLAY</button>
+<h1>🦖 DINO GALAXY 2.0</h1>
+<button onclick="start()">PLAY</button>
 </div>
 
-<div id="gameOver">
-<h1>💀 GAME OVER</h1>
-<button onclick="restart()">RESTART</button>
-</div>
-
-<div id="shop"></div>
+<div id="shop" style="display:none"></div>
 <div id="ui"></div>
-
-<button id="jumpBtn">⬆</button>
-<button id="shootBtn">🔫</button>
-<button id="ultBtn">⚡</button>
-<button id="shopBtn">🛒 SHOP</button>
-
 <canvas id="game" width="900" height="500" style="display:none"></canvas>
 
 <script>
-
-/* DOM */
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
 const menu=document.getElementById("menu");
 const shop=document.getElementById("shop");
 const ui=document.getElementById("ui");
-const gameOver=document.getElementById("gameOver");
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
 
-const jumpBtn=document.getElementById("jumpBtn");
-const shootBtn=document.getElementById("shootBtn");
-const ultBtn=document.getElementById("ultBtn");
-const shopBtn=document.getElementById("shopBtn");
+/* SAVE SYSTEM */
+let save=JSON.parse(localStorage.getItem("dinoSave"))||{
+coins:0,
+maxHP:10,
+damage:5,
+ultCD:8000
+};
+function saveGame(){
+localStorage.setItem("dinoSave",JSON.stringify(save));
+}
 
 /* GAME DATA */
-let ground=420;
-let score=0;
-let coins=50; // чтобы можно было покупать
-let lives=10;
-let level=1;
-let device="phone";
+let player={x:100,y:380,vy:0,hp:save.maxHP};
+let gravity=1;
+let bullets=[];
+let zombies=[];
+let particles=[];
+let wave=1;
+let spawnCount=0;
 let gameRunning=false;
-let shopOpen=false;
+let ultReady=true;
+let shake=0;
+let damageFlash=0;
 
-let weaponDamage=5;
-let playerColor="#32cd32";
-let legendary=false;
-
-/* PLAYER */
-let player={x:100,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true};
-
-/* MENU */
-function startGame(){
-menu.innerHTML=`
-<h2>Выберите устройство</h2>
-<br>
-<button onclick="selectDevice('pc')">ПК</button><br><br>
-<button onclick="selectDevice('phone')">Телефон</button>
-`;
-}
-
-function selectDevice(type){
-device=type;
-
-if(type==="pc"){
-menu.innerHTML=`
-<h2>💻 УПРАВЛЕНИЕ</h2>
-<p>Прыжок — ПРОБЕЛ</p>
-<p>Стрелять — Клик мыши</p>
-<p>Ульта — F</p>
-<br>
-<button onclick="startPCGame()">НАЧАТЬ</button>
-`;
-return;
-}
-
-startMobileGame();
-}
-
-function startPCGame(){
+/* START */
+function start(){
 menu.style.display="none";
 canvas.style.display="block";
-shopBtn.style.display="block";
 gameRunning=true;
+nextWave();
 update();
 }
 
-function startMobileGame(){
-menu.style.display="none";
-canvas.style.display="block";
-shopBtn.style.display="block";
-jumpBtn.style.display="block";
-shootBtn.style.display="block";
-ultBtn.style.display="block";
-gameRunning=true;
-update();
+/* WAVES */
+function nextWave(){
+spawnCount=5+wave*2;
+setTimeout(()=>spawnZombie(),1000);
 }
 
-function restart(){location.reload();}
+function spawnZombie(){
+if(spawnCount<=0)return;
+let type=Math.random();
+let z={x:900,y:380,type:"normal",hp:5+wave};
+if(type<0.25){z.type="fast";z.hp=3+wave;}
+else if(type<0.5){z.type="tank";z.hp=15+wave*2;}
+else if(type<0.65){z.type="boom";z.hp=4+wave;}
+zombies.push(z);
+spawnCount--;
+setTimeout(spawnZombie,800);
+}
 
-/* ===== МАГАЗИН ===== */
-shopBtn.onclick=()=>{
-shopOpen=true;
-gameRunning=false;   // ПАУЗА
+/* CONTROLS */
+document.addEventListener("keydown",e=>{
+if(e.code==="Space")player.vy=-18;
+if(e.key==="f")useUlt();
+});
+canvas.addEventListener("mousedown",()=>shoot());
+
+function shoot(){
+bullets.push({x:player.x+60,y:player.y+20});
+}
+
+function useUlt(){
+if(!ultReady)return;
+ultReady=false;
+zombies=[];
+setTimeout(()=>ultReady=true,save.ultCD);
+}
+
+/* SHOP */
+document.addEventListener("keydown",e=>{
+if(e.key==="b")openShop();
+});
+
+function openShop(){
+gameRunning=false;
 shop.style.display="block";
-openMainShop();
-};
+shop.innerHTML=`
+<h2>МАГАЗИН</h2>
+<p>💰 ${save.coins}</p>
+<button onclick="upgradeHP()">+HP (20)</button>
+<button onclick="upgradeDMG()">+Урон (20)</button>
+<button onclick="upgradeUlt()">-КД Ульты (30)</button>
+<br><button onclick="closeShop()">Закрыть</button>
+`;
+}
 
 function closeShop(){
-shopOpen=false;
 shop.style.display="none";
-gameRunning=true;    // ВОЗВРАТ ИГРЫ
+gameRunning=true;
 update();
 }
 
-function openMainShop(){
-shop.innerHTML=`
-<h1>🛒 МАГАЗИН</h1>
-<p>💰 Монеты: ${coins}</p>
-<button class="shopMainBtn" onclick="openSkins()">🎨 СКИНЫ</button>
-<button class="shopMainBtn" onclick="openWeapons()">🔫 ОРУЖИЕ</button>
-<br><br>
-<button class="shopItem" onclick="closeShop()">❌ Закрыть</button>
-`;
+function upgradeHP(){
+if(save.coins>=20){
+save.coins-=20;
+save.maxHP+=5;
+player.hp=save.maxHP;
+saveGame();
+openShop();
 }
-
-function openSkins(){
-shop.innerHTML=`
-<h1>🎨 СКИНЫ</h1>
-<p>💰 Монеты: ${coins}</p>
-
-<button class="shopItem" onclick="buySkin('#32cd32',5)">🟢 Зелёный (5)</button>
-<button class="shopItem" onclick="buySkin('blue',5)">🔵 Синий (5)</button>
-<button class="shopItem" onclick="buySkin('red',5)">🔴 Красный (5)</button>
-<button class="shopItem" onclick="buySkin('purple',5)">🟣 Фиолетовый (5)</button>
-<button class="shopItem" onclick="buyLegendary()">🌈 Легендарный (30)</button>
-
-<br>
-<button class="shopItem" onclick="openMainShop()">⬅ Назад</button>
-`;
 }
-
-function openWeapons(){
-shop.innerHTML=`
-<h1>🔫 ОРУЖИЕ</h1>
-<p>💰 Монеты: ${coins}</p>
-
-<button class="shopItem" onclick="buyWeapon(5,10)">🔫 Пистолет (10)</button>
-<button class="shopItem" onclick="buyWeapon(8,20)">🔫 АК-47 (20)</button>
-<button class="shopItem" onclick="buyWeapon(15,30)">💥 Гранатомёт (30)</button>
-<button class="shopItem" onclick="buyWeapon(20,40)">⚡ Лазер (40)</button>
-<button class="shopItem" onclick="buyWeapon(30,50)">🔥 Плазма (50)</button>
-
-<br>
-<button class="shopItem" onclick="openMainShop()">⬅ Назад</button>
-`;
+function upgradeDMG(){
+if(save.coins>=20){
+save.coins-=20;
+save.damage+=2;
+saveGame();
+openShop();
 }
-
-function buySkin(color,price){
-if(coins>=price){
-coins-=price;
-playerColor=color;
-legendary=false;
-openSkins();
+}
+function upgradeUlt(){
+if(save.coins>=30){
+save.coins-=30;
+save.ultCD=Math.max(2000,save.ultCD-1000);
+saveGame();
+openShop();
 }
 }
 
-function buyLegendary(){
-if(coins>=30){
-coins-=30;
-legendary=true;
-openSkins();
-}
-}
-
-function buyWeapon(dmg,price){
-if(coins>=price){
-coins-=price;
-weaponDamage=dmg;
-openWeapons();
-}
-}
-
-/* GAME LOOP */
+/* LOOP */
 function update(){
 if(!gameRunning)return;
 
+ctx.save();
+ctx.translate(Math.random()*shake,Math.random()*shake);
 ctx.fillStyle="black";
 ctx.fillRect(0,0,900,500);
 
+/* Player physics */
+player.vy+=gravity;
+player.y+=player.vy;
+if(player.y>380){player.y=380;player.vy=0;}
+
 /* Player */
-if(legendary){
-playerColor=`hsl(${Date.now()/10%360},100%,50%)`;
+ctx.fillStyle="lime";
+ctx.fillRect(player.x,player.y,50,40);
+
+/* Bullets */
+bullets.forEach((b,i)=>{
+b.x+=10;
+ctx.fillStyle="yellow";
+ctx.fillRect(b.x,b.y,8,4);
+zombies.forEach((z,zi)=>{
+if(b.x>z.x && b.x<z.x+40){
+z.hp-=save.damage;
+bullets.splice(i,1);
+if(z.hp<=0){
+zombies.splice(zi,1);
+save.coins+=5;
+wave++;
+nextWave();
+}
+}
+});
+});
+
+/* Zombies */
+zombies.forEach((z,i)=>{
+let speed=2;
+if(z.type==="fast")speed=4;
+if(z.type==="tank")speed=1.5;
+if(z.type==="boom")speed=3;
+z.x-=speed;
+
+ctx.fillStyle=
+z.type==="fast"?"cyan":
+z.type==="tank"?"purple":
+z.type==="boom"?"orange":"green";
+
+ctx.fillRect(z.x,z.y,40,40);
+
+if(z.x<player.x+40){
+player.hp-=2;
+shake=10;
+damageFlash=5;
+zombies.splice(i,1);
+}
+});
+
+/* Effects */
+if(damageFlash>0){
+ctx.fillStyle="rgba(255,0,0,0.3)";
+ctx.fillRect(0,0,900,500);
+damageFlash--;
+}
+shake*=0.9;
+
+ui.innerHTML=`❤️ ${player.hp} | 💰 ${save.coins} | 🌊 Wave ${wave} | ⚡ ${ultReady?"READY":"..."}`;
+
+if(player.hp<=0){
+gameRunning=false;
+menu.style.display="block";
 }
 
-ctx.fillStyle=playerColor;
-ctx.fillRect(player.x,player.y,60,50);
-
-/* UI */
-ui.innerHTML="🏆 "+score+" ❤️ "+lives+" 💰 "+coins;
-
+ctx.restore();
 requestAnimationFrame(update);
 }
-
 </script>
 </body>
 </html>
