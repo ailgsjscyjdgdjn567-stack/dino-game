@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Survival: Real Crash Physics</title>
+    <title>Sky Survival: Bridge & Traffic Crash</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
         #ui { position: absolute; top: 10px; left: 10px; color: #0f0; background: rgba(0,0,0,0.8); padding: 12px; border: 1px solid #0f0; pointer-events: none; border-radius: 5px; font-family: monospace; z-index: 10; }
-        #death-log { position: absolute; top: 10px; right: 10px; color: #ff4d4d; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #ff4d4d; width: 220px; max-height: 70vh; overflow-y: auto; display: none; font-size: 11px; z-index: 100; }
-        #disaster-ui { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; }
+        #disaster-ui { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
         .dis-btn { background: #c0392b; color: white; border: 2px solid #fff; padding: 10px; cursor: pointer; border-radius: 5px; font-weight: bold; }
-        #cabin-chatter { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); color: #fff; text-shadow: 2px 2px #000; font-size: 20px; text-align: center; pointer-events: none; width: 90%; font-weight: bold; }
+        #death-log { position: absolute; top: 150px; right: 10px; color: #ff4d4d; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #ff4d4d; width: 180px; display: none; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -21,178 +20,165 @@
     ВЫСОТА: <span id="alt">0</span> м
 </div>
 
+<div id="disaster-ui">
+    <button class="dis-btn" onclick="trigger('wing')">✂️ ОТРЫВ КРЫЛА</button>
+    <button class="dis-btn" onclick="trigger('alien')">🛸 НЛО</button>
+</div>
+
 <div id="death-log">
-    <b style="color:white">ОТЧЕТ О ПАССАЖИРАХ:</b><br><hr>
+    <b style="color:white">ПАССАЖИРЫ:</b><br><hr>
     <div id="log-content"></div>
 </div>
-
-<div id="disaster-ui">
-    <button class="dis-btn" onclick="trigger('wing')">✂️ СЛОМАТЬ КРЫЛО</button>
-    <button class="dis-btn" onclick="trigger('alien')">🛸 ВЫЗВАТЬ НЛО</button>
-</div>
-
-<div id="cabin-chatter"></div>
 
 <script>
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d');
 document.body.appendChild(canvas);
-const logBox = document.getElementById('death-log');
-const logContent = document.getElementById('log-content');
-const chatter = document.getElementById('cabin-chatter');
 
 let gameActive = true, worldX = 0, cameraX = 0;
-let plane = { x: 300, y: 300, angle: 0, speed: 8, broken: false, wingBroken: false, engineOk: true };
-let buildings = [], clouds = [], debris = [], survivors = [], blood = [], ufo = {active: false};
-let names = ["Иван", "Мария", "Алекс", "Дмитрий", "Елена", "Петр", "Ольга", "Сергей", "Анна", "Виктор", "Кевин", "Лиза"];
+let plane = { x: 300, y: 300, angle: 0, speed: 8, broken: false, wingBroken: false, wingPart: null };
+let buildings = [], clouds = [], debris = [], survivors = [], blood = [], cars = [], rivers = [];
+let names = ["Иван", "Мария", "Алекс", "Дмитрий", "Елена", "Петр", "Ольга", "Сергей"];
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.onresize = resize; resize();
 
-// Инициализация
-for(let i=0; i<20; i++) clouds.push({ x: Math.random()*10000, y: 50+Math.random()*200, w: 80+Math.random()*120 });
-for(let i=0; i<40; i++) buildings.push({ x: i * 2900 + 1500, w: 120+Math.random()*100, h: 150+Math.random()*350 });
+// Генерация мира
+for(let i=0; i<15; i++) clouds.push({ x: Math.random()*20000, y: 50+Math.random()*200, w: 80+Math.random()*100 });
+for(let i=0; i<30; i++) buildings.push({ x: i * 3500 + 1000, w: 150, h: 200 + Math.random()*300 });
+for(let i=0; i<10; i++) rivers.push({ x: i * 7000 + 4000, w: 1200 });
+
+// Машины на мостах
+function spawnCars() {
+    rivers.forEach(r => {
+        if(Math.random() > 0.98) cars.push({ x: r.x, y: canvas.height-125, speed: 2+Math.random()*3, color: 'red', broken: false });
+    });
+}
 
 window.onmousemove = (e) => { if(!plane.broken) plane.targetY = e.clientY; };
 
 function trigger(type) {
-    if(type === 'wing') { plane.wingBroken = true; say("ПРАВОЕ КРЫЛО ОТОРВАЛОСЬ!"); }
-    if(type === 'alien') { ufo = {active: true, x: worldX - 200, y: plane.y, state: 'hunting'}; say("НЛО ЗАМЕЧЕНО!"); }
+    if(type === 'wing') { 
+        plane.wingBroken = true; 
+        plane.wingPart = { x: worldX + 300, y: plane.y, vx: 2, vy: 0, rot: 0 };
+    }
 }
-
-function say(txt) { chatter.innerText = txt; setTimeout(() => chatter.innerText="", 3000); }
 
 function handleCrash(msg) {
     if(plane.broken) return;
     plane.broken = true;
-    logBox.style.display = 'block';
-    say(msg);
-
-    // Разрушение самолета на куски
-    for(let i=0; i<25; i++) {
-        debris.push({
-            x: worldX + plane.x, y: plane.y,
-            vx: (Math.random()-0.5)*25, vy: (Math.random()-0.5)*20 - 5,
-            w: 10+Math.random()*30, h: 5+Math.random()*15,
-            rot: Math.random()*Math.PI, rv: (Math.random()-0.5)*0.2,
-            color: Math.random() > 0.3 ? "white" : "gray"
-        });
-    }
-
-    // Разлет людей
-    let count = 6 + Math.floor(Math.random()*6);
-    for(let i=0; i<count; i++) {
-        survivors.push({
-            name: names[i % names.length] + " " + (i+1),
-            x: worldX + plane.x, y: plane.y,
-            vx: (Math.random()-0.5)*15, vy: -10 - Math.random()*15,
-            color: `hsl(${Math.random()*360}, 70%, 50%)`,
-            health: 100, dead: false, bleeding: Math.random() > 0.4,
-            grounded: false, screamTimer: 0
-        });
-    }
-    updateLog();
-    setTimeout(() => location.reload(), 10000);
-}
-
-function updateLog() {
-    logContent.innerHTML = survivors.map(s => 
-        `<div style="color:${s.dead ? '#ff4d4d' : '#4dff4d'}">${s.dead ? '💀' : '👤'} ${s.name} - ${s.dead ? 'МЕРТВ' : 'ЖИВ ('+Math.floor(s.health)+'%)'}</div>`
-    ).join('');
+    document.getElementById('death-log').style.display = 'block';
+    
+    // Самолет на куски
+    for(let i=0; i<20; i++) debris.push({ x: worldX+300, y: plane.y, vx: (Math.random()-0.5)*20, vy: -10-Math.random()*10, w: 20, h: 10, rot: 0, rv: 0.1 });
+    
+    // Пассажиры
+    for(let i=0; i<5; i++) survivors.push({
+        name: names[i], x: worldX+300, y: plane.y, vx: (Math.random()-0.5)*15, vy: -15, 
+        color: 'yellow', health: 100, dead: false, grounded: false, chat: "О НЕТ!", timer: 0
+    });
+    setTimeout(() => location.reload(), 12000);
 }
 
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
     if(!plane.broken) {
         worldX += plane.speed;
         plane.y += ((plane.targetY || 300) - plane.y) * 0.05;
-        cameraX = worldX - 200;
-        if(plane.wingBroken) plane.y += 3;
+        cameraX = worldX - 300;
+        if(plane.wingBroken) { plane.y += 5; plane.angle = 0.2; }
+        spawnCars();
         
-        // НЛО
-        if(ufo.active) {
-            ufo.x += (worldX + 150 - ufo.x) * 0.05;
-            ufo.y += (plane.y - ufo.y) * 0.05;
-            if(Math.abs(ufo.x - (worldX+150)) < 50) {
-                plane.engineOk = false;
-                ctx.strokeStyle = "lime"; ctx.lineWidth = 5;
-                ctx.beginPath(); ctx.moveTo(ufo.x - cameraX, ufo.y); ctx.lineTo(300, plane.y); ctx.stroke();
+        // Столкновения с машинами
+        cars.forEach(c => {
+            if(!c.broken && Math.abs((worldX+300)-c.x) < 50 && Math.abs(plane.y - c.y) < 30) {
+                c.broken = true;
+                for(let i=0; i<5; i++) debris.push({ x: c.x, y: c.y, vx: (Math.random()-0.5)*10, vy: -5, w: 10, h: 5, rot: 0, rv: 0.2, color: 'red' });
+                handleCrash("СТОЛКНОВЕНИЕ С МАШИНАМИ!");
             }
-        }
-
-        // Проверка столкновений
-        buildings.forEach(b => {
-            if(worldX+300 > b.x && worldX+300 < b.x+b.w && plane.y > canvas.height-100-b.h) handleCrash("СТОЛКНОВЕНИЕ!");
         });
-        if(plane.y > canvas.height - 100) handleCrash("КРУШЕНИЕ!");
+        
+        if(plane.y > canvas.height-100) handleCrash("КРУШЕНИЕ!");
     }
 
-    // РИСОВАНИЕ
-    ctx.fillStyle = "#1e3799"; ctx.fillRect(0,0,canvas.width, canvas.height); // Небо
-    
-    // Облака
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    clouds.forEach(c => ctx.beginPath() && ctx.arc(c.x - cameraX*0.5, c.y, c.w, 0, Math.PI*2) && ctx.fill());
+    // Фон и Небо
+    ctx.fillStyle = "#1e3799"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    clouds.forEach(c => { ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(c.x - cameraX*0.5, c.y, c.w, 0, Math.PI*2); ctx.fill(); });
 
-    // Земля
+    // Земля и реки
     ctx.fillStyle = "#2ecc71"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+    rivers.forEach(r => {
+        let rx = r.x - cameraX;
+        ctx.fillStyle = "#3498db"; ctx.fillRect(rx, canvas.height-100, r.w, 100);
+        // Мост
+        ctx.fillStyle = "#7f8c8d"; ctx.fillRect(rx, canvas.height-130, r.w, 30);
+        for(let j=0; j<r.w; j+=100) { ctx.fillStyle="#333"; ctx.fillRect(rx+j, canvas.height-100, 20, 100); }
+    });
+
+    // Аэропорт (взлетка)
+    for(let i=0; i<5; i++) {
+        let ax = i*10000 - cameraX;
+        ctx.fillStyle="#333"; ctx.fillRect(ax, canvas.height-105, 1200, 10);
+        ctx.fillStyle="white"; for(let j=0; j<1200; j+=100) ctx.fillRect(ax+j, canvas.height-100, 40, 5);
+    }
 
     // Дома и фонари
     buildings.forEach(b => {
         let bx = b.x - cameraX;
         ctx.fillStyle = "#2f3640"; ctx.fillRect(bx, canvas.height-100-b.h, b.w, b.h);
-        // Фонари на крыше
-        ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(bx + b.w/2, canvas.height-100-b.h, 5, 0, Math.PI*2); ctx.fill();
-        ctx.shadowBlur = 15; ctx.shadowColor = "yellow"; ctx.fill(); ctx.shadowBlur = 0;
+        ctx.fillStyle = "yellow"; ctx.beginPath(); ctx.arc(bx+b.w/2, canvas.height-100-b.h, 5, 0, Math.PI*2); ctx.fill();
     });
+
+    // Машины
+    cars.forEach(c => {
+        if(!c.broken) c.x += c.speed;
+        let cx = c.x - cameraX;
+        ctx.fillStyle = c.color; ctx.fillRect(cx, c.y, 40, 20);
+        ctx.fillStyle = "black"; ctx.fillRect(cx+5, c.y+15, 10, 10); ctx.fillRect(cx+25, c.y+15, 10, 10);
+    });
+
+    // Падающее крыло
+    if(plane.wingPart) {
+        plane.wingPart.y += 5; plane.wingPart.rot += 0.1;
+        ctx.save(); ctx.translate(plane.wingPart.x - cameraX, plane.wingPart.y); ctx.rotate(plane.wingPart.rot);
+        ctx.fillStyle = "gray"; ctx.fillRect(-10, 0, 20, 40); ctx.restore();
+    }
 
     // Кровь
-    ctx.fillStyle = "red";
-    blood.forEach(p => ctx.beginPath() && ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2) && ctx.fill());
+    blood.forEach(p => { ctx.fillStyle = "red"; ctx.beginPath(); ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2); ctx.fill(); });
 
-    // Обломки самолета
+    // Обломки
     debris.forEach(d => {
         d.x += d.vx; d.y += d.vy; d.vy += 0.5; d.rot += d.rv;
-        if(d.y > canvas.height-100) { d.y = canvas.height-100; d.vx *= 0.5; d.vy = 0; }
+        if(d.y > canvas.height-100) { d.y = canvas.height-100; d.vx *= 0.8; }
         ctx.save(); ctx.translate(d.x - cameraX, d.y); ctx.rotate(d.rot);
-        ctx.fillStyle = d.color; ctx.fillRect(-d.w/2, -d.h/2, d.w, d.h); ctx.restore();
+        ctx.fillStyle = d.color || "white"; ctx.fillRect(-d.w/2, -d.h/2, d.w, d.h); ctx.restore();
     });
 
-    // Люди
+    // Пассажиры
     survivors.forEach(s => {
         if(!s.grounded) {
             s.x += s.vx; s.y += s.vy; s.vy += 0.5;
             if(s.y > canvas.height-100) { s.y = canvas.height-100; s.grounded = true; }
-        } else if(!s.dead && s.bleeding) {
-            s.health -= 0.1;
-            if(Math.random() > 0.9) blood.push({x: s.x, y: s.y, r: 2+Math.random()*3});
-            if(s.health <= 0) { s.dead = true; updateLog(); }
+        } else if(!s.dead) {
+            s.health -= 0.1; s.timer++;
+            if(Math.random() > 0.8) blood.push({x: s.x, y: s.y, r: 2+Math.random()*3});
+            if(s.health <= 0) s.dead = true;
+            if(s.timer % 150 === 0) s.chat = ["ГДЕ ПОМОЩЬ?", "МНЕ БОЛЬНО!", "КТО ЖИВ?", "АААА!"][Math.floor(Math.random()*4)];
         }
-
         let sx = s.x - cameraX;
-        // Тело
-        ctx.fillStyle = s.color; ctx.fillRect(sx-5, s.y-(s.dead?5:15), 10, s.dead?5:15);
-        // Голова и Глаза
-        ctx.fillStyle = "#ffdbac"; ctx.fillRect(sx-4, s.y-(s.dead?8:22), 8, 8);
-        ctx.fillStyle = "white"; ctx.fillRect(sx-3, s.y-(s.dead?6:20), 2, 2); ctx.fillRect(sx+1, s.y-(s.dead?6:20), 2, 2);
-        
-        if(!s.dead && s.grounded) {
-            s.screamTimer++;
-            if(s.screamTimer % 100 < 50) {
-                ctx.fillStyle = "white"; ctx.font = "bold 12px Arial";
-                ctx.fillText("ПОМОГИТЕ!", sx-30, s.y-30);
-            }
+        ctx.fillStyle = s.dead ? "gray" : s.color; ctx.fillRect(sx-5, s.y-15, 10, 15);
+        ctx.fillStyle = "#ffdbac"; ctx.fillRect(sx-4, s.y-22, 8, 8);
+        if(!s.dead) {
+            ctx.fillStyle = "white"; ctx.font = "bold 10px Arial"; ctx.fillText(s.chat, sx-20, s.y-30);
         }
     });
 
-    // Самолет (живой)
+    // Живой самолет
     if(!plane.broken) {
-        ctx.save(); ctx.translate(300, plane.y);
-        ctx.fillStyle = "gray"; ctx.fillRect(-10, -35, 20, 70); // Крылья
-        if(plane.wingBroken) { ctx.fillStyle = "black"; ctx.fillRect(0, 0, 15, 35); } // След отлома
-        ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill(); // Корпус
-        if(!plane.engineOk) { ctx.fillStyle = "orange"; ctx.beginPath(); ctx.arc(-30, 0, 10, 0, Math.PI*2); ctx.fill(); }
+        ctx.save(); ctx.translate(300, plane.y); ctx.rotate(plane.angle);
+        ctx.fillStyle = "gray"; ctx.fillRect(-10, -35, 20, plane.wingBroken ? 35 : 70);
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill();
         ctx.restore();
     }
 
