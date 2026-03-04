@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Miner Physics</title>
+    <title>3D Miner: Gravity & Jump</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #111; color: white; touch-action: none; }
         canvas { display: block; }
@@ -14,44 +14,49 @@
         
         #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; pointer-events: none; display: none; border: 1px solid #444; }
         .shop-area { pointer-events: auto; margin-top: 10px; }
-        .shop-btn { background: #27ae60; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 5px; }
+        .shop-btn { background: #27ae60; border: none; color: white; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 5px; font-weight: bold; }
 
-        /* Сообщение о полной сумке */
-        #msg-full { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); color: #ff4757; font-weight: bold; font-size: 24px; display: none; text-shadow: 2px 2px 4px #000; pointer-events: none; }
+        /* Уведомление */
+        #msg-full { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff4757; font-weight: bold; font-size: 32px; display: none; text-shadow: 3px 3px 0px #000; pointer-events: none; z-index: 10; }
 
         /* Мобильное управление */
-        #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
-        .m-btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; user-select: none; }
+        #mobile-controls { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: space-between; padding: 0 20px; box-sizing: border-box; }
+        .m-group { display: flex; gap: 10px; align-items: flex-end; }
+        .m-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; user-select: none; border: 1px solid rgba(255,255,255,0.3); }
 
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 1px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; opacity: 0.7; }
     </style>
 </head>
 <body>
 
 <div id="overlay">
-    <h1>3D ШАХТЕР: ФИЗИКА</h1>
+    <h1>3D MINER PRO</h1>
+    <p>Копай вниз, находи сокровища!</p>
     <div id="menu-device">
-        <button class="btn" onclick="initGame('pc')">💻 КОМПЬЮТЕР</button>
-        <button class="btn" onclick="initGame('mobile')">📱 ТЕЛЕФОН</button>
+        <button class="btn" onclick="initGame('pc')">💻 ПК (WASD + Пробел)</button>
+        <button class="btn" onclick="initGame('mobile')">📱 ТЕЛЕФОН (Кнопки)</button>
     </div>
 </div>
 
 <div id="ui">
     <div>💰 Деньги: <span id="money" style="color:#f1c40f">0</span></div>
     <div>🎒 Сумка: <span id="bag">0</span> / <span id="maxBag">3</span></div>
-    <div>🛠️: <span id="tool-name">Лопата</span></div>
+    <div>🛠️: <span id="tool-name" style="color:#3498db">Лопата</span></div>
     <div class="shop-area">
-        <button class="shop-btn" onclick="sellAll()">Продать всё</button>
-        <button id="upgrade-btn" class="shop-btn" onclick="buyUpgrade()">Апгрейд ($200)</button>
+        <button class="shop-btn" onclick="sellAll()">ПРОДАТЬ ВСЁ</button>
+        <button id="upgrade-btn" class="shop-btn" onclick="buyUpgrade()">УЛУЧШИТЬ СУМКУ ($200)</button>
     </div>
 </div>
 
-<div id="msg-full">СУМКА ПОЛНА!</div>
+<div id="msg-full">🎒 СУМКА ПОЛНА!</div>
 <div id="crosshair"></div>
 
 <div id="mobile-controls">
-    <div class="m-btn" id="m-up">⬆️</div>
-    <div style="display:flex; gap:15px;">
+    <div class="m-group">
+        <div class="m-btn" id="m-up">⬆️</div>
+    </div>
+    <div class="m-group">
+        <div class="m-btn" id="m-jump" style="background:rgba(52, 152, 219, 0.5)">🚀</div>
         <div class="m-btn" onclick="toggleTool()">🔄</div>
         <div class="m-btn" id="dig-btn" style="background:rgba(231, 76, 60, 0.5)">⛏️</div>
     </div>
@@ -68,26 +73,32 @@
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 2, 18);
+    scene.fog = new THREE.Fog(0x87ceeb, 1, 20);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
-    const light = new THREE.HemisphereLight(0xeeeeff, 0x444422, 1);
+    const light = new THREE.HemisphereLight(0xffffff, 0x444422, 1.2);
     scene.add(light);
 
     // Мир
     const blocks = [];
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     function createWorld() {
-        for(let x = -5; x <= 5; x++) {
-            for(let z = -5; z <= 5; z++) {
-                for(let y = 0; y > -10; y--) {
-                    let color = y === 0 ? 0x2ecc71 : (y > -3 ? 0x8b4513 : 0x7f8c8d);
-                    let type = y === 0 || y > -3 ? 'dirt' : 'stone';
-                    if(Math.random() > 0.95 && y < -2) { color = 0xf1c40f; type = 'gold'; }
+        for(let x = -6; x <= 6; x++) {
+            for(let z = -6; z <= 6; z++) {
+                for(let y = 0; y > -12; y--) {
+                    let type = 'dirt';
+                    let color = 0x8b4513; // Земля
+
+                    if (y === 0) color = 0x27ae60; // Трава сверху
+                    else if (y < -2) { type = 'stone'; color = 0x95a5a6; } // Камень
+                    
+                    if (y < -3 && Math.random() > 0.93) { type = 'gold'; color = 0xf1c40f; }
+                    if (y < -6 && Math.random() > 0.97) { type = 'diamond'; color = 0x3498db; }
 
                     const mat = new THREE.MeshStandardMaterial({ color: color });
                     const cube = new THREE.Mesh(geometry, mat);
@@ -115,47 +126,51 @@
         }
     };
 
-    // Движение (ПК)
-    const onKeyDown = (e) => {
+    // Клавиатура
+    document.addEventListener('keydown', (e) => {
         if(e.code === 'KeyW') moveForward = true;
         if(e.code === 'KeyS') moveBackward = true;
         if(e.code === 'KeyA') moveLeft = true;
         if(e.code === 'KeyD') moveRight = true;
+        if(e.code === 'Space' && canJump) { velocity.y += 5; canJump = false; }
         if(e.code === 'Digit1') setTool('shovel');
         if(e.code === 'Digit2') setTool('pickaxe');
-    };
-    const onKeyUp = (e) => {
+    });
+    document.addEventListener('keyup', (e) => {
         if(e.code === 'KeyW') moveForward = false;
         if(e.code === 'KeyS') moveBackward = false;
         if(e.code === 'KeyA') moveLeft = false;
         if(e.code === 'KeyD') moveRight = false;
-    };
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
+    });
 
-    // Мобильное движение (упрощенное)
-    document.getElementById('m-up').ontouchstart = () => moveForward = true;
-    document.getElementById('m-up').ontouchend = () => moveForward = false;
+    // Мобилки
+    const btnUp = document.getElementById('m-up');
+    btnUp.ontouchstart = (e) => { e.preventDefault(); moveForward = true; };
+    btnUp.ontouchend = () => moveForward = false;
+
+    const btnJump = document.getElementById('m-jump');
+    btnJump.ontouchstart = (e) => { e.preventDefault(); if(canJump) { velocity.y += 5; canJump = false; }};
 
     function setTool(t) {
         state.tool = t;
         document.getElementById('tool-name').innerText = t === 'shovel' ? 'Лопата' : 'Кирка';
     }
-
     window.toggleTool = () => setTool(state.tool === 'shovel' ? 'pickaxe' : 'shovel');
 
+    // Механика копания
     const raycaster = new THREE.Raycaster();
     function dig() {
         raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
         const hits = raycaster.intersectObjects(blocks);
-        if(hits.length > 0 && hits[0].distance < 3) {
+        if(hits.length > 0 && hits[0].distance < 3.5) {
             if(state.bag >= state.maxBag) {
-                showFullMsg();
-                return;
+                showMsg(); return;
             }
             const obj = hits[0].object;
             const type = obj.userData.type;
-            if((type === 'dirt' && state.tool === 'shovel') || (type !== 'dirt' && state.tool === 'pickaxe')) {
+            const canDig = (type === 'dirt' && state.tool === 'shovel') || (type !== 'dirt' && state.tool === 'pickaxe');
+
+            if(canDig) {
                 scene.remove(obj);
                 blocks.splice(blocks.indexOf(obj), 1);
                 state.bag++;
@@ -164,10 +179,10 @@
         }
     }
 
-    function showFullMsg() {
-        const el = document.getElementById('msg-full');
-        el.style.display = 'block';
-        setTimeout(() => el.style.display = 'none', 1500);
+    function showMsg() {
+        const m = document.getElementById('msg-full');
+        m.style.display = 'block';
+        setTimeout(() => m.style.display = 'none', 1200);
     }
 
     window.sellAll = () => { state.money += state.bag * 50; state.bag = 0; updateUI(); };
@@ -180,13 +195,13 @@
         document.getElementById('money').innerText = state.money;
         document.getElementById('bag').innerText = state.bag;
         document.getElementById('maxBag').innerText = state.maxBag;
-        document.getElementById('upgrade-btn').innerText = `Апгрейд ($${state.bagLvl * 200})`;
+        document.getElementById('upgrade-btn').innerText = `УЛУЧШИТЬ СУМКУ ($${state.bagLvl * 200})`;
     }
 
     document.addEventListener('mousedown', () => { if(controls.isLocked) dig(); });
     document.getElementById('dig-btn').ontouchstart = (e) => { e.preventDefault(); dig(); };
 
-    // Физика и Рендер
+    // Цикл игры
     let prevTime = performance.now();
     function animate() {
         requestAnimationFrame(animate);
@@ -194,51 +209,50 @@
         const delta = (time - prevTime) / 1000;
 
         if (controls.isLocked || state.isMobile) {
-            // Гравитация
-            velocity.y -= 9.8 * delta; 
+            velocity.y -= 15.0 * delta; // Гравитация
 
-            // Движение
             velocity.x -= velocity.x * 10.0 * delta;
             velocity.z -= velocity.z * 10.0 * delta;
 
-            let direction = new THREE.Vector3();
-            direction.z = Number(moveForward) - Number(moveBackward);
-            direction.x = Number(moveRight) - Number(moveLeft);
-            direction.normalize();
+            let dir = new THREE.Vector3();
+            dir.z = Number(moveForward) - Number(moveBackward);
+            dir.x = Number(moveRight) - Number(moveLeft);
+            dir.normalize();
 
-            if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-            if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+            if (moveForward || moveBackward) velocity.z -= dir.z * 50.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= dir.x * 50.0 * delta;
 
             controls.moveRight(-velocity.x * delta);
             controls.moveForward(-velocity.z * delta);
             camera.position.y += (velocity.y * delta);
 
-            // Проверка коллизии с блоками (чтобы не падать сквозь пол)
-            let feetPos = camera.position.clone();
-            feetPos.y -= 1.5; // Смещение от камеры до ног
-            
-            let onGround = false;
-            for(let block of blocks) {
-                if(Math.abs(feetPos.x - block.position.x) < 0.6 && 
-                   Math.abs(feetPos.z - block.position.z) < 0.6 &&
-                   feetPos.y < block.position.y + 0.5 && feetPos.y > block.position.y - 0.5) {
-                    camera.position.y = block.position.y + 1.5;
-                    velocity.y = 0;
-                    onGround = true;
-                    break;
+            // Коллизия (Пол)
+            let p = camera.position;
+            canJump = false;
+            for(let b of blocks) {
+                if(Math.abs(p.x - b.position.x) < 0.7 && Math.abs(p.z - b.position.z) < 0.7) {
+                    // Проверка головы (чтобы не прыгать сквозь потолок)
+                    if(p.y < b.position.y + 1.6 && p.y > b.position.y + 0.5) {
+                        p.y = b.position.y + 1.6;
+                        velocity.y = 0;
+                        canJump = true;
+                        break;
+                    }
                 }
             }
-            
-            // Если упал слишком глубоко (упал в бездну), возвращаем наверх
-            if(camera.position.y < -20) camera.position.set(0, 5, 0);
+            if(p.y < -30) p.set(0, 5, 0); // Респаун
         }
-
         prevTime = time;
         renderer.render(scene, camera);
     }
-
     camera.position.set(0, 2, 0);
     animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 </script>
 </body>
 </html>
