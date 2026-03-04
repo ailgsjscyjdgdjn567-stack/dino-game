@@ -3,195 +3,229 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dino Boss Battle</title>
-
+<title>Dino Galaxy 2.0</title>
 <style>
-body{margin:0;overflow:hidden;font-family:Arial;background:black;}
-canvas{display:none;margin:auto;background:linear-gradient(to top,#111,#000);}
-
-#menu{
-position:absolute;width:100%;height:100%;
-background:url("menu.jpg") center/cover no-repeat;
-display:flex;flex-direction:column;
-justify-content:center;align-items:center;gap:20px;
-}
-
-#menu h1{color:white;font-size:40px;text-shadow:2px 2px 10px black;}
-
-button{
-padding:15px 40px;font-size:22px;border:none;
-border-radius:10px;cursor:pointer;background:orange;color:black;
-}
-
-#info{
-position:absolute;top:10px;left:10px;
-color:white;font-size:20px;
-}
-
-#end{
-position:absolute;width:100%;text-align:center;
-top:120px;font-size:40px;color:white;display:none;
+body{margin:0;overflow:hidden;background:black;font-family:Arial}
+canvas{display:block;margin:auto}
+#ui{position:absolute;top:10px;left:10px;color:white}
+#ultBtn{
+position:absolute;
+bottom:20px;
+right:20px;
+padding:15px;
+font-size:18px;
 }
 </style>
 </head>
 <body>
 
-<div id="menu">
-<h1>DINO BOSS BATTLE</h1>
-<button onclick="startGame()">▶ Играть</button>
-<button onclick="exitGame()">❌ Выйти</button>
-</div>
-
-<div id="info"></div>
-<div id="end"></div>
-
-<canvas id="gameCanvas" width="900" height="300"></canvas>
+<div id="ui"></div>
+<button id="ultBtn">⚡ ULT</button>
+<canvas id="game" width="900" height="500"></canvas>
 
 <script>
-const canvas=document.getElementById("gameCanvas");
+const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
-let ground=240;
-let gameRunning=false;
+let ground=420;
 let score=0;
-let lives=3;
+let coins=0;
+let level=1;
+let lives=5;
 
-let player={x:80,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true};
+let player={x:100,y:ground-60,vy:0,gravity:1,jump:-18,grounded:true,color:"lime"};
 
-let boss={x:900,y:ground-120,hp:15,speed:3};
+let zombies=[];
 let bullets=[];
-let bossBullets=[];
+let particles=[];
+let stars=[];
+let planets=[];
+let boss=null;
+let ultReady=true;
 
-function startGame(){
-document.getElementById("menu").style.display="none";
-canvas.style.display="block";
-gameRunning=true;
-update();
+/* ===== ЗВЁЗДЫ ===== */
+for(let i=0;i<100;i++){
+stars.push({x:Math.random()*900,y:Math.random()*500,s:Math.random()*2});
 }
 
-function exitGame(){window.close();}
-
-function drawStars(){
-ctx.fillStyle="white";
-for(let i=0;i<40;i++){
-ctx.fillRect(Math.random()*900,Math.random()*300,2,2);
-}
+/* ===== ПЛАНЕТЫ ===== */
+for(let i=0;i<3;i++){
+planets.push({x:Math.random()*900,y:Math.random()*200,r:30+Math.random()*40});
 }
 
-function drawDino(){
-ctx.fillStyle="lime";
-ctx.fillRect(player.x,player.y,50,40);
-ctx.fillRect(player.x+40,player.y-20,30,30);
+/* ===== СПАВН ===== */
+function spawnZombie(){
+zombies.push({x:900,y:ground-60,hp:10+level});
+}
+setInterval(spawnZombie,2000);
+
+function spawnBoss(){
+boss={x:900,y:ground-150,hp:50+level*10};
 }
 
-function drawBoss(){
-ctx.fillStyle="purple";
-ctx.fillRect(boss.x,boss.y,120,120);
-}
-
+/* ===== СТРЕЛЬБА ===== */
 function shoot(){
-bullets.push({x:player.x+60,y:player.y+20});
+bullets.push({x:player.x+50,y:player.y+20,explosive:false});
 }
 
-function bossShoot(){
-bossBullets.push({x:boss.x,y:boss.y+60});
+document.addEventListener("keydown",e=>{
+if(e.code==="Space" && player.grounded){
+player.vy=player.jump;
+player.grounded=false;
 }
+if(e.code==="KeyF") shoot();
+});
 
-setInterval(()=>{
-if(gameRunning) bossShoot();
-},1500);
+/* ===== УЛЬТА ===== */
+document.getElementById("ultBtn").onclick=()=>{
+if(!ultReady) return;
+ultReady=false;
 
-function drawBullets(){
-ctx.fillStyle="yellow";
-bullets.forEach((b,i)=>{
-b.x+=10;
-ctx.fillRect(b.x,b.y,10,5);
+zombies=[];
+if(boss) boss.hp-=40;
 
-if(b.x>boss.x&&b.x<boss.x+120&&b.y>boss.y&&b.y<boss.y+120){
-boss.hp--;
-score+=10;
-bullets.splice(i,1);
-if(boss.hp<=0) winGame();
-}
+for(let i=0;i<50;i++){
+particles.push({
+x:450,y:250,
+vx:(Math.random()-0.5)*10,
+vy:(Math.random()-0.5)*10,
+life:50
 });
 }
 
-function drawBossBullets(){
-ctx.fillStyle="red";
-bossBullets.forEach((b,i)=>{
-b.x-=6;
-ctx.fillRect(b.x,b.y,10,5);
+setTimeout(()=>ultReady=true,10000);
+};
 
-if(
-b.x>player.x&&
-b.x<player.x+50&&
-b.y>player.y&&
-b.y<player.y+40
-){
-lives--;
-bossBullets.splice(i,1);
-if(lives<=0) gameOver();
-}
+/* ===== ЧАСТИЦЫ ===== */
+function createExplosion(x,y){
+for(let i=0;i<20;i++){
+particles.push({
+x:x,y:y,
+vx:(Math.random()-0.5)*6,
+vy:(Math.random()-0.5)*6,
+life:30
 });
 }
+}
 
+/* ===== ОБНОВЛЕНИЕ ===== */
 function update(){
-if(!gameRunning)return;
+ctx.fillStyle="black";
+ctx.fillRect(0,0,900,500);
 
-ctx.clearRect(0,0,900,300);
-drawStars();
+/* ЗВЁЗДЫ */
+ctx.fillStyle="white";
+stars.forEach(s=>{
+s.x-=0.5;
+if(s.x<0)s.x=900;
+ctx.fillRect(s.x,s.y,s.s,s.s);
+});
 
+/* ПЛАНЕТЫ */
+planets.forEach(p=>{
+p.x-=0.2;
+if(p.x<-50)p.x=950;
+ctx.fillStyle="purple";
+ctx.beginPath();
+ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ctx.fill();
+});
+
+/* ИГРОК */
 player.vy+=player.gravity;
 player.y+=player.vy;
-
 if(player.y>=ground-60){
 player.y=ground-60;
 player.vy=0;
 player.grounded=true;
 }
 
-boss.x-=boss.speed;
-if(boss.x<500) boss.x=900;
+ctx.fillStyle=player.color;
+ctx.fillRect(player.x,player.y,50,40);
+ctx.fillRect(player.x+40,player.y-20,30,30);
 
-drawBoss();
-drawBullets();
-drawBossBullets();
-drawDino();
+/* ПУЛИ */
+bullets.forEach((b,i)=>{
+b.x+=10;
+ctx.fillStyle="yellow";
+ctx.fillRect(b.x,b.y,10,5);
 
-document.getElementById("info").innerHTML=
-"❤️ Жизни: "+lives+" | 🏆 Очки: "+score;
+zombies.forEach((z,zi)=>{
+if(b.x>z.x && b.x<z.x+40){
+z.hp-=5;
+createExplosion(z.x,z.y);
+bullets.splice(i,1);
+if(z.hp<=0){
+zombies.splice(zi,1);
+score++;
+coins++;
+}
+}
+});
+
+if(boss && b.x>boss.x-60 && b.x<boss.x+60){
+boss.hp-=5;
+createExplosion(boss.x,boss.y);
+bullets.splice(i,1);
+if(boss.hp<=0){
+coins+=10;
+level++;
+boss=null;
+}
+}
+});
+
+/* ЗОМБИ */
+zombies.forEach((z,i)=>{
+z.x-=2+level*0.3;
+ctx.fillStyle="green";
+ctx.fillRect(z.x,z.y,40,60);
+
+if(z.x<player.x+40){
+lives--;
+zombies.splice(i,1);
+}
+});
+
+/* БОСС */
+if(score>0 && score%20===0 && !boss){
+spawnBoss();
+}
+
+if(boss){
+boss.x-=1.5;
+ctx.fillStyle="red";
+ctx.beginPath();
+ctx.arc(boss.x,boss.y,60,0,Math.PI*2);
+ctx.fill();
+}
+
+/* ЧАСТИЦЫ */
+particles.forEach((p,i)=>{
+p.x+=p.vx;
+p.y+=p.vy;
+p.life--;
+ctx.fillStyle="orange";
+ctx.fillRect(p.x,p.y,4,4);
+if(p.life<=0) particles.splice(i,1);
+});
+
+/* UI */
+document.getElementById("ui").innerHTML=
+"🏆 "+score+
+" ❤️ "+lives+
+" 💰 "+coins+
+" 🌍 "+level+
+" ⚡ "+(ultReady?"READY":"...");
+
+if(lives<=0){
+alert("GAME OVER");
+location.reload();
+}
 
 requestAnimationFrame(update);
 }
-
-function jump(){
-if(player.grounded){
-player.vy=player.jump;
-player.grounded=false;
-}
-}
-
-function winGame(){
-gameRunning=false;
-document.getElementById("end").style.display="block";
-document.getElementById("end").innerHTML="👑 ТЫ ПОБЕДИЛ!";
-}
-
-function gameOver(){
-gameRunning=false;
-document.getElementById("end").style.display="block";
-document.getElementById("end").innerHTML="💀 GAME OVER";
-}
-
-document.addEventListener("keydown",e=>{
-if(e.code==="Space") jump();
-if(e.code==="KeyF") shoot();
-});
-
-canvas.addEventListener("touchstart",()=>{
-jump();
-});
+update();
 </script>
-
 </body>
 </html>
