@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dino Galaxy</title>
+<title>Dino Galaxy Ultimate</title>
 <style>
 body{margin:0;overflow:hidden;background:black;font-family:Arial;color:white}
 canvas{display:block;margin:auto}
@@ -16,29 +16,26 @@ background:#222;
 color:white;
 font-size:14px;
 box-shadow:0 0 8px rgba(255,255,255,0.4);
+cursor:pointer;
 }
-#jumpBtn{bottom:20px;left:20px}
-#shootBtn{bottom:20px;right:20px}
-#ultBtn{bottom:90px;right:20px}
-#shopBtn{top:10px;right:10px}
+#jumpBtn{bottom:20px;left:20px;display:none}
+#shootBtn{bottom:20px;right:20px;display:none}
+#ultBtn{bottom:90px;right:20px;display:none}
+#shopBtn{top:10px;right:10px;display:none}
 #shop{
 position:absolute;
-top:50%;
-left:50%;
+top:50%;left:50%;
 transform:translate(-50%,-50%);
 background:rgba(0,0,0,0.95);
-padding:20px;
-border-radius:15px;
-display:none;
+padding:20px;border-radius:15px;
+display:none;text-align:center;
 }
 #menu,#gameOver{
 position:absolute;
-top:50%;
-left:50%;
+top:50%;left:50%;
 transform:translate(-50%,-50%);
 background:rgba(0,0,0,0.9);
-padding:30px;
-border-radius:20px;
+padding:30px;border-radius:20px;
 text-align:center;
 }
 #gameOver{display:none}
@@ -49,7 +46,7 @@ text-align:center;
 
 <div id="menu">
 <h1>🦖 DINO GALAXY</h1>
-<button onclick="startGame()">START</button>
+<button onclick="startGame()">PLAY</button>
 </div>
 
 <div id="gameOver">
@@ -60,10 +57,10 @@ text-align:center;
 <div id="shop"></div>
 <div id="ui"></div>
 
-<button id="jumpBtn" style="display:none">⬆</button>
-<button id="shootBtn" style="display:none">🔫</button>
-<button id="ultBtn" style="display:none">⚡</button>
-<button id="shopBtn" style="display:none">SHOP</button>
+<button id="jumpBtn">⬆</button>
+<button id="shootBtn">🔫</button>
+<button id="ultBtn">⚡</button>
+<button id="shopBtn">SHOP</button>
 
 <canvas id="game" width="900" height="500" style="display:none"></canvas>
 
@@ -78,6 +75,7 @@ let level=1;
 let lives=15;
 let gameRunning=false;
 let ultReady=true;
+let device="phone";
 
 let weaponDamage=5;
 let shootFlash=0;
@@ -100,14 +98,28 @@ const planets=[
 ["#001a33","#003366"]
 ];
 
+/* ===== MENU ===== */
 function startGame(){
+menu.innerHTML = `
+<h2>Выберите устройство</h2>
+<button onclick="selectDevice('pc')">ПК</button><br><br>
+<button onclick="selectDevice('phone')">Телефон</button><br><br>
+<button onclick="selectDevice('tablet')">Планшет</button>
+`;
+}
+
+function selectDevice(type){
+device=type;
 menu.style.display="none";
 canvas.style.display="block";
+shopBtn.style.display="block";
+gameRunning=true;
+
+if(type==="phone"||type==="tablet"){
 jumpBtn.style.display="block";
 shootBtn.style.display="block";
 ultBtn.style.display="block";
-shopBtn.style.display="block";
-gameRunning=true;
+}
 update();
 }
 
@@ -124,76 +136,58 @@ shop.innerHTML=
 "<button onclick='buyLegendary()'>🌈 Легендарный (20)</button><br>"+
 "<button onclick='closeShop()'>Закрыть</button>";
 };
-
 function closeShop(){shop.style.display="none";}
+function buyWeapon(dmg){if(coins>=10){coins-=10;weaponDamage=dmg;}}
+function buyLegendary(){if(coins>=20){coins-=20;legendary=true;}}
 
-function buyWeapon(dmg){
-if(coins>=10){
-coins-=10;
-weaponDamage=dmg;
-}
-}
+/* ===== PHONE BUTTONS ===== */
+jumpBtn.onclick=()=>{if(player.grounded){player.vy=player.jump;player.grounded=false;}};
+shootBtn.onclick=()=>{shoot();};
+ultBtn.onclick=()=>{useUlt();};
 
-function buyLegendary(){
-if(coins>=20){
-coins-=20;
-legendary=true;
-}
-}
+/* ===== PC CONTROLS ===== */
+document.addEventListener("keydown",e=>{
+if(device!=="pc")return;
 
-/* ===== BUTTONS ===== */
-jumpBtn.onclick=()=>{
-if(player.grounded){
+if(e.code==="Space"&&player.grounded){
 player.vy=player.jump;
 player.grounded=false;
 }
-};
+if(e.key==="f")useUlt();
+});
+canvas.addEventListener("mousedown",()=>{
+if(device==="pc")shoot();
+});
 
-shootBtn.onclick=()=>{
+function shoot(){
 bullets.push({x:player.x+75,y:player.y+21});
 shootFlash=5;
 recoil=5;
-};
+}
 
-ultBtn.onclick=()=>{
+function useUlt(){
 if(!ultReady)return;
 ultReady=false;
 zombies=[];
 if(boss)boss.hp-=40;
 setTimeout(()=>ultReady=true,8000);
-};
+}
 
 /* ===== SPAWN ===== */
 setInterval(()=>{
 if(gameRunning)
-zombies.push({x:900,y:ground-60,hp:9+level});
+zombies.push({x:900,y:ground-60,hp:9+level,frame:0});
 },2000);
 
 function spawnBoss(){
-boss={
-x:900,
-y:ground-150,
-hp:80+level*20,
-phase:1
-};
-}
-
-function explosion(x,y){
-for(let i=0;i<25;i++){
-particles.push({
-x:x,y:y,
-vx:(Math.random()-0.5)*6,
-vy:(Math.random()-0.5)*6,
-life:40
-});
-}
+boss={x:900,y:ground-200,hp:100+level*30,phase:1,frame:0};
 }
 
 /* ===== UPDATE ===== */
 function update(){
 if(!gameRunning)return;
 
-/* BACKGROUND */
+/* Background */
 let p=planets[level%planets.length];
 let grad=ctx.createLinearGradient(0,0,0,500);
 grad.addColorStop(0,p[0]);
@@ -201,15 +195,10 @@ grad.addColorStop(1,p[1]);
 ctx.fillStyle=grad;
 ctx.fillRect(0,0,900,500);
 
-/* PLAYER */
+/* Player Physics */
 player.vy+=player.gravity;
 player.y+=player.vy;
-if(player.y>=ground-60){
-player.y=ground-60;
-player.vy=0;
-player.grounded=true;
-}
-
+if(player.y>=ground-60){player.y=ground-60;player.vy=0;player.grounded=true;}
 player.frame+=0.15;
 
 if(legendary){
@@ -240,7 +229,6 @@ ctx.fillStyle="white";
 ctx.beginPath();
 ctx.arc(player.x+50-recoil,player.y+8,4,0,Math.PI*2);
 ctx.fill();
-
 ctx.fillStyle="black";
 ctx.beginPath();
 ctx.arc(player.x+52-recoil,player.y+8,2,0,Math.PI*2);
@@ -271,7 +259,7 @@ shootFlash--;
 }
 if(recoil>0)recoil-=0.5;
 
-/* BULLETS */
+/* Bullets */
 bullets.forEach((b,i)=>{
 b.x+=12;
 ctx.fillStyle="yellow";
@@ -280,84 +268,89 @@ ctx.fillRect(b.x,b.y,8,4);
 zombies.forEach((z,zi)=>{
 if(b.x>z.x && b.x<z.x+40){
 z.hp-=weaponDamage;
-explosion(z.x,z.y);
 bullets.splice(i,1);
-if(z.hp<=0){
-zombies.splice(zi,1);
-score++;
-coins++;
-}
+if(z.hp<=0){zombies.splice(zi,1);score++;coins++;}
 }
 });
 
-if(boss && b.x>boss.x && b.x<boss.x+140){
+if(boss && b.x>boss.x && b.x<boss.x+280){
 boss.hp-=weaponDamage;
 bullets.splice(i,1);
 }
 });
 
-/* ZOMBIES */
+/* Zombies */
 zombies.forEach((z,i)=>{
 z.x-=2+level*0.5;
-ctx.fillStyle="green";
-ctx.fillRect(z.x,z.y,40,60);
-if(z.x<player.x+40){
-lives--;
-zombies.splice(i,1);
-}
+z.frame+=0.15;
+
+/* Body */
+ctx.fillStyle="#2ecc71";
+ctx.fillRect(z.x,z.y,40,50);
+
+/* Head */
+ctx.beginPath();
+ctx.arc(z.x+20,z.y-5,15,0,Math.PI*2);
+ctx.fill();
+
+/* Eyes */
+ctx.fillStyle="white";
+ctx.beginPath();
+ctx.arc(z.x+15,z.y-8,3,0,Math.PI*2);
+ctx.arc(z.x+25,z.y-8,3,0,Math.PI*2);
+ctx.fill();
+ctx.fillStyle="black";
+ctx.beginPath();
+ctx.arc(z.x+15,z.y-8,1.5,0,Math.PI*2);
+ctx.arc(z.x+25,z.y-8,1.5,0,Math.PI*2);
+ctx.fill();
+
+/* Mouth */
+ctx.strokeStyle="black";
+ctx.beginPath();
+ctx.arc(z.x+20,z.y-2,5,0,Math.PI);
+ctx.stroke();
+
+/* Legs */
+let move=Math.sin(z.frame)*5;
+ctx.fillStyle="#145a32";
+ctx.fillRect(z.x+8,z.y+50,6,15+move);
+ctx.fillRect(z.x+26,z.y+50,6,15-move);
+
+/* Arms */
+ctx.fillRect(z.x-5,z.y+10,8,20);
+ctx.fillRect(z.x+37,z.y+10,8,20);
+
+if(z.x<player.x+40){lives--;zombies.splice(i,1);}
 });
 
-/* BOSS */
+/* Boss */
 if(score>=30 && !boss)spawnBoss();
-
 if(boss){
 boss.x-=1;
-if(boss.hp<40)boss.phase=2;
+boss.frame+=0.1;
+if(boss.hp<50)boss.phase=2;
 
 ctx.fillStyle=boss.phase===1?"darkred":"purple";
-ctx.fillRect(boss.x,boss.y,140,90);
+ctx.fillRect(boss.x,boss.y,280,160);
 
-if(Math.random()<0.03*boss.phase){
-fireballs.push({x:boss.x,y:boss.y+40});
-}
-
-if(boss.hp<=0){
-coins+=30;
-level++;
-boss=null;
-}
-}
-
-/* FIRE */
-fireballs.forEach((f,i)=>{
-f.x-=6;
-ctx.fillStyle="orange";
 ctx.beginPath();
-ctx.arc(f.x,f.y,10,0,Math.PI*2);
+ctx.arc(boss.x+140,boss.y-20,40,0,Math.PI*2);
 ctx.fill();
-if(f.x<player.x+40 && f.x>player.x){
-lives--;
-fireballs.splice(i,1);
-}
-});
 
-/* PARTICLES */
-particles.forEach((p,i)=>{
-p.x+=p.vx;
-p.y+=p.vy;
-p.life--;
-ctx.fillStyle="orange";
-ctx.fillRect(p.x,p.y,3,3);
-if(p.life<=0)particles.splice(i,1);
-});
+ctx.fillStyle="white";
+ctx.beginPath();
+ctx.arc(boss.x+120,boss.y-30,8,0,Math.PI*2);
+ctx.arc(boss.x+160,boss.y-30,8,0,Math.PI*2);
+ctx.fill();
+
+if(boss.hp<=0){coins+=30;level++;boss=null;}
+}
 
 /* UI */
 ui.innerHTML="🏆 "+score+" ❤️ "+lives+" 💰 "+coins+" 🌍 "+level+" ⚡ "+(ultReady?"READY":"...");
 
-if(lives<=0){
-gameRunning=false;
-gameOver.style.display="block";
-}
+if(lives<=0){gameRunning=false;gameOver.style.display="block";}
 
 requestAnimationFrame(update);
 }
