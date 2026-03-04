@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Extreme Flight Simulator: Helicopters & Rivers</title>
+    <title>Sky Survival: Pilot Record</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
         canvas { display: block; }
 
-        /* ИНТЕРФЕЙС */
         #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; text-align: center; }
         .btn { padding: 15px 40px; margin: 10px; font-size: 18px; cursor: pointer; background: #2980b9; color: white; border: none; border-radius: 5px; box-shadow: 0 4px #1a5276; }
-        .btn:active { transform: translateY(2px); box-shadow: 0 2px #1a5276; }
         
         #ui { position: absolute; top: 10px; left: 10px; color: #0f0; background: rgba(0,0,0,0.8); padding: 12px; border: 1px solid #0f0; pointer-events: none; display: none; border-radius: 5px; font-family: monospace; }
         #disaster-ui { position: absolute; top: 10px; right: 10px; display: none; flex-direction: column; gap: 8px; }
@@ -21,8 +19,10 @@
 
         #mobile-ui { position: absolute; bottom: 20px; width: 100%; display: none; justify-content: space-between; padding: 0 40px; box-sizing: border-box; }
         #joy-base { width: 110px; height: 110px; background: rgba(255,255,255,0.15); border: 2px solid #fff; border-radius: 50%; position: relative; }
-        #joy-stick { width: 45px; height: 45px; background: #fff; border-radius: 50%; position: absolute; top: 32px; left: 32px; opacity: 0.8; }
-        .action-btn { width: 80px; height: 80px; background: #f1c40f; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; border: 3px solid #fff; box-shadow: 0 5px #d4ac0d; }
+        #joy-stick { width: 45px; height: 45px; background: #fff; border-radius: 50%; position: absolute; top: 32px; left: 32px; }
+        .action-btn { width: 80px; height: 80px; background: #f1c40f; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; border: 3px solid #fff; }
+        
+        .score-val { color: #f1c40f; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -35,6 +35,7 @@
 </div>
 
 <div id="ui">
+    ДИСТАНЦИЯ: <span id="dist" class="score-val">0</span> км<br>
     ВЫСОТА: <span id="alt">0</span> м<br>
     СКОРОСТЬ: <span id="spd">0</span> км/ч<br>
     ШАССИ: <span id="gear-status">УБРАНЫ</span>
@@ -62,6 +63,7 @@ const chatterBox = document.getElementById('cabin-chatter');
 
 let isMobile = false;
 let gameActive = false;
+let distanceTraveled = 0;
 let plane = {
     x: 250, y: 300, w: 85, h: 22,
     angle: 0, speed: 8, targetAngle: 0,
@@ -92,20 +94,19 @@ function start(mode) {
     document.getElementById('disaster-ui').style.display = 'flex';
     if(isMobile) document.getElementById('mobile-ui').style.display = 'flex';
     
-    // Создаем реки
     for(let i=0; i<20; i++) rivers.push(i * 3000 + 1000);
-    // Создаем начальные вертолеты
-    for(let i=0; i<5; i++) spawnHeli();
+    for(let i=0; i<2; i++) spawnHeli();
     
     gameActive = true;
     loop();
 }
 
 function spawnHeli() {
+    if(helis.length >= 3) return;
     helis.push({
-        x: canvas.width + Math.random() * 1000,
-        y: 100 + Math.random() * (canvas.height - 300),
-        speed: 2 + Math.random() * 3,
+        x: canvas.width + 500 + Math.random() * 2000,
+        y: 100 + Math.random() * (canvas.height - 350),
+        speed: 1.5 + Math.random() * 2.5,
         rotor: 0
     });
 }
@@ -136,7 +137,6 @@ function say(text) {
     setTimeout(() => { if(chatterBox.innerText === text) chatterBox.innerText = ""; }, 3500);
 }
 
-// Мобильное управление
 const jBase = document.getElementById('joy-base');
 const jStick = document.getElementById('joy-stick');
 jBase.ontouchmove = (e) => {
@@ -149,7 +149,7 @@ jBase.ontouchmove = (e) => {
     jStick.style.transform = `translate(${tx}px, ${ty}px)`;
     joy.x = tx/45; joy.y = ty/45; joy.active = true;
 };
-joyBase.ontouchend = () => { jStick.style.transform = `translate(0,0)`; joy.active = false; };
+jBase.ontouchend = () => { jStick.style.transform = `translate(0,0)`; joy.active = false; };
 
 function explode() {
     plane.broken = true;
@@ -160,14 +160,17 @@ function explode() {
             rot: 0, rv: Math.random()*0.2
         });
     }
-    say("БАБААААХ!!!");
-    setTimeout(() => location.reload(), 3000);
+    say("ФИНАЛЬНАЯ ДИСТАНЦИЯ: " + Math.floor(distanceTraveled) + " КМ");
+    setTimeout(() => location.reload(), 4000);
 }
 
 function loop() {
     if(!gameActive) return;
 
     if(!plane.broken && !plane.drowning) {
+        // Увеличение дистанции
+        distanceTraveled += plane.speed / 100;
+        
         if(plane.engineOk) {
             if(!isMobile) {
                 let dx = mouse.x - plane.x;
@@ -179,15 +182,11 @@ function loop() {
                 plane.speed = 9;
             }
         } else {
-            plane.speed *= 0.997;
-            plane.targetAngle = 0.3; 
+            plane.speed *= 0.997; plane.targetAngle = 0.3; 
             if(plane.speed < 3) plane.speed = 3;
         }
 
-        if(plane.wingLost) {
-            plane.angle += 0.05; // Закручивание
-            plane.targetAngle = 0.5;
-        }
+        if(plane.wingLost) { plane.angle += 0.05; plane.targetAngle = 0.5; }
 
         let diff = plane.targetAngle - plane.angle;
         while(diff < -Math.PI) diff += Math.PI*2;
@@ -197,56 +196,44 @@ function loop() {
         plane.y += Math.sin(plane.angle) * plane.speed + 1.2;
         worldX += Math.cos(plane.angle) * plane.speed;
 
-        // Падающее крыло
-        if(plane.wingLost) {
-            plane.wingY += 6;
-            plane.wingAngle += 0.1;
-        }
+        if(plane.wingLost) { plane.wingY += 6; plane.wingAngle += 0.1; }
 
-        // Вертолеты
         helis.forEach((h, i) => {
             h.x -= (h.speed + Math.cos(plane.angle)*plane.speed);
             h.rotor += 0.5;
-            if(h.x < -100) { helis.splice(i, 1); spawnHeli(); }
-            
-            // Коллизия с вертолетом
+            if(h.x < -150) { 
+                helis.splice(i, 1); 
+                if(Math.random() > 0.5) spawnHeli();
+            }
             let dx = plane.x - h.x;
             let dy = plane.y - h.y;
             if(Math.sqrt(dx*dx + dy*dy) < 50) explode();
         });
 
-        // Случайные фразы
-        if(Math.random() > 0.992) {
-            const phrases = ["Пассажир: Ух ты, какой вид!", "Ребенок: Мама, смотри, вертолетик!", "Стюардесса: Желаете напитки?", "Пассажир: Почему мы так сильно трясемся?", "Пассажир: Ой, кажется, я вижу реку!"];
+        if(Math.random() > 0.994) {
+            const phrases = ["Пассажир: Погода сегодня отличная!", "Стюардесса: Пристегните ремни.", "Ребенок: Гляди, речка!"];
             if(chatterBox.innerText === "") say(phrases[Math.floor(Math.random()*phrases.length)]);
         }
 
-        // Земля и Вода
         if(plane.y > canvas.height - 100) {
             let isRiver = false;
-            rivers.forEach(rx => {
-                let dist = Math.abs((worldX % 15000) - rx);
-                if(dist < 200) isRiver = true;
-            });
+            rivers.forEach(rx => { if(Math.abs((worldX % 15000) - rx) < 200) isRiver = true; });
 
             if(isRiver) {
-                plane.drowning = true;
-                plane.speed = 0;
-                say("ВСЕ: МЫ ПЛЮХНУЛИСЬ В РЕКУ! ПОМОГИТЕ, МЫ ТОНЕМ!");
+                plane.drowning = true; plane.speed = 0;
+                say("МЫ ТОНЕМ! РЕЗУЛЬТАТ: " + Math.floor(distanceTraveled) + " КМ");
                 setTimeout(() => location.reload(), 5000);
             } else {
                 let onRunway = (worldX % 1500 < 350);
                 if(onRunway && plane.gear && plane.speed < 5) {
                     plane.y = canvas.height - 110; plane.speed *= 0.95; plane.angle = 0;
-                } else {
-                    explode();
-                }
+                } else { explode(); }
             }
         }
     } else if(plane.broken) {
         plane.parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.3; p.rot += p.rv; });
     } else if(plane.drowning) {
-        plane.y += 0.5; // Медленное утопление
+        plane.y += 0.5;
     }
 
     draw();
@@ -259,77 +246,44 @@ function draw() {
     ctx.fillStyle = `rgb(${15*(1-day)}, ${110*(1-day)}, ${230*(1-day) + 20})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Рисуем реки и аэропорты
     ctx.fillStyle = "#2ecc71";
     ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
 
     for(let i=-1; i<6; i++) {
         let x = (i * 1500 - (worldX % 9000));
         if(x < -500) x += 9000;
-
-        // Река
         ctx.fillStyle = "#3498db";
         ctx.fillRect(x + 800, canvas.height - 100, 300, 100);
-        
-        // Аэропорт
         ctx.fillStyle = "#333";
         ctx.fillRect(x, canvas.height - 105, 400, 10);
     }
 
-    // Вертолеты
     helis.forEach(h => {
-        ctx.fillStyle = "#2c3e50";
-        ctx.fillRect(h.x, h.y, 30, 15);
-        ctx.fillStyle = "#bdc3c7";
-        ctx.fillRect(h.x - 20, h.y - 5, 70, 4); // Винт
-        ctx.fillStyle = "#000";
-        ctx.fillRect(h.x + 25, h.y + 2, 15, 5); // Хвост
+        ctx.fillStyle = "#2c3e50"; ctx.fillRect(h.x, h.y, 30, 15);
+        ctx.fillStyle = "#bdc3c7"; ctx.fillRect(h.x - 20, h.y - 5, 70, 4);
+        ctx.fillStyle = "#000"; ctx.fillRect(h.x + 25, h.y + 2, 15, 5);
     });
 
-    // Падающее крыло
     if(plane.wingLost && !plane.broken) {
-        ctx.save();
-        ctx.translate(plane.wingX, plane.wingY);
-        ctx.rotate(plane.wingAngle);
-        ctx.fillStyle = "lightgray";
-        ctx.fillRect(-10, 10, 20, 30);
-        ctx.restore();
+        ctx.save(); ctx.translate(plane.wingX, plane.wingY); ctx.rotate(plane.wingAngle);
+        ctx.fillStyle = "lightgray"; ctx.fillRect(-10, 10, 20, 30); ctx.restore();
     }
 
-    // Самолет
     if(!plane.broken) {
-        ctx.save();
-        ctx.translate(plane.x, plane.y);
-        ctx.rotate(plane.angle);
-        
-        if(plane.fire) {
-            ctx.fillStyle = "orange";
-            ctx.beginPath(); ctx.arc(-40, 0, 15*Math.random()+10, 0, Math.PI*2); ctx.fill();
-        }
-
-        ctx.fillStyle = "white";
-        ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill();
-        
-        ctx.fillStyle = "lightgray";
-        ctx.fillRect(-10, -35, 20, 35); // Верхнее крыло
-        if(!plane.wingLost) ctx.fillRect(-10, 0, 20, 35); // Нижнее крыло
-        
-        if(plane.gear) {
-            ctx.fillStyle = "#000"; ctx.fillRect(-20, 10, 6, 12); ctx.fillRect(15, 10, 6, 12);
-        }
+        ctx.save(); ctx.translate(plane.x, plane.y); ctx.rotate(plane.angle);
+        if(plane.fire) { ctx.fillStyle = "orange"; ctx.beginPath(); ctx.arc(-40, 0, 15*Math.random()+10, 0, Math.PI*2); ctx.fill(); }
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.ellipse(0, 0, 45, 12, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "lightgray"; ctx.fillRect(-10, -35, 20, 35);
+        if(!plane.wingLost) ctx.fillRect(-10, 0, 20, 35);
+        if(plane.gear) { ctx.fillStyle = "#000"; ctx.fillRect(-20, 10, 6, 12); ctx.fillRect(15, 10, 6, 12); }
         ctx.restore();
     } else {
         plane.parts.forEach(p => {
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rot);
-            ctx.fillStyle = "white";
-            ctx.fillRect(-10, -5, 20, 10);
-            ctx.restore();
+            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = "white"; ctx.fillRect(-10, -5, 20, 10); ctx.restore();
         });
     }
 
-    // UI
+    document.getElementById('dist').innerText = Math.floor(distanceTraveled);
     document.getElementById('alt').innerText = Math.floor(Math.max(0, canvas.height - 100 - plane.y));
     document.getElementById('spd').innerText = Math.floor(plane.speed * 60);
 }
