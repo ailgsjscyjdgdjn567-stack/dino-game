@@ -2,180 +2,192 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Survival: Rescue & Space Update</title>
+    <title>Sky Crash Simulator: Passenger Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
-        #ui { position: absolute; top: 10px; left: 10px; color: #0f0; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #0f0; pointer-events: none; border-radius: 5px; z-index: 10; font-size: 14px; }
-        #dis-ui { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 100; }
-        .btn { background: #c0392b; color: white; border: 1px solid #fff; padding: 6px; cursor: pointer; font-size: 10px; font-weight: bold; border-radius: 4px; }
-        #mobile { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 40px; box-sizing: border-box; z-index: 100; }
-        #joy { width: 100px; height: 100px; background: rgba(255,255,255,0.1); border: 2px solid #fff; border-radius: 50%; position: relative; }
-        #stick { width: 40px; height: 40px; background: #fff; border-radius: 50%; position: absolute; top: 30px; left: 30px; }
-        .act { width: 70px; height: 70px; background: #f1c40f; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 25px; border: 2px solid #fff; }
+        
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; color: white; z-index: 100;
+        }
+        .btn { padding: 20px 40px; margin: 10px; font-size: 20px; cursor: pointer; border: none; border-radius: 50px; }
+        .btn-pc { background: #3498db; color: white; }
+        .btn-mobile { background: #e67e22; color: white; }
+
+        #ui { position: fixed; top: 20px; right: 20px; text-align: right; color: white; text-shadow: 2px 2px 4px #000; }
+        .hazard-btn { background: #c0392b; color: white; border: 2px solid white; padding: 8px 15px; margin: 5px; cursor: pointer; border-radius: 5px; }
+        
+        /* Чат пассажиров */
+        #passenger-chat {
+            position: fixed; bottom: 20px; left: 20px; width: 300px; height: 180px;
+            background: rgba(0,0,0,0.7); color: #fff; padding: 15px; border-radius: 10px;
+            border: 1px solid #555; display: flex; flex-direction: column;
+        }
+        #messages { flex-grow: 1; overflow-y: hidden; font-size: 14px; line-height: 1.4; }
+        .name { color: #f1c40f; font-weight: bold; }
     </style>
 </head>
 <body>
 
+<div id="overlay">
+    <h1>SKY CRASH SIMULATOR</h1>
+    <p>Выберите управление:</p>
+    <button class="btn btn-pc" onclick="startGame('pc')">ПК (Мышь + Клавиша F)</button>
+    <button class="btn btn-mobile" onclick="startGame('mobile')">ТЕЛЕФОН (Тачскрин)</button>
+</div>
+
 <div id="ui">
-    ALT: <span id="alt">0</span> | DST: <span id="dst">0</span><br>
-    STATUS: <span id="st" style="color:white">FLYING</span>
+    <div style="font-size: 24px;">Скорость: <span id="speedVal">0</span> км/ч</div>
+    <button class="hazard-btn" onclick="triggerEvent('fire')">🔥 Пожар двигателя</button>
+    <button class="hazard-btn" onclick="triggerEvent('ufo')">🛸 Вызвать НЛО</button>
 </div>
 
-<div id="dis-ui">
-    <button class="btn" onclick="trigger('wing')">✂️ WING LOSS</button>
-    <button class="btn" onclick="trigger('engine')">💥 ENGINE EXPLODE</button>
-    <button class="btn" onclick="trigger('alien')">🛸 SUMMON UFO</button>
-    <button class="btn" onclick="trigger('birds')">🐦 BIRD STRIKE</button>
+<div id="passenger-chat">
+    <div style="border-bottom: 1px solid #777; margin-bottom: 5px; font-weight: bold;">📱 Внутрисамолетный чат</div>
+    <div id="messages"></div>
 </div>
 
-<div id="mobile">
-    <div id="joy"><div id="stick"></div></div>
-    <div class="act" onclick="plane.gear=!plane.gear">🎡</div>
-</div>
+<canvas id="gameCanvas"></canvas>
 
 <script>
-const canvas = document.createElement('canvas');
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-document.body.appendChild(canvas);
+let device = 'pc';
+let isGameRunning = false;
 
-let worldX = 0, worldY = 300, camX = 0, camY = 300;
-let plane = { x: 0, y: 300, angle: 0, speed: 10, broken: false, wing: true, engine: true, gear: false, spaceEvent: false };
-let buildings = [], clouds = [], rivers = [], airports = [], debris = [], survivors = [], blood = [], ufo = null, heli = null;
-const phrases = ["HELP!", "OVER HERE!", "I'M BLEEDING!", "RESCUE!", "LOOK! A HELI!", "STAY ALIVE!"];
+// Данные для чата
+const passengerNames = ["Иван (3A)", "Мария (12B)", "Джон (5C)", "Стюардесса", "Пилот", "Бабуля", "Бизнесмен"];
+const phrasesNormal = ["Прекрасный вид!", "Когда принесут еду?", "Надеюсь, мы прилетим вовремя.", "Обожаю летать.", "Вайфай платный?"];
+const phrasesPanic = ["ЧТО ЭТО БЫЛ ЗА ЗВУК?!", "ПОЧЕМУ МЫ ПАДАЕМ?!", "МАМА!!!", "ГДЕ КИСЛОРОДНЫЕ МАСКИ?", "МЫ ВСЕ УМРЕМ!", "Я не успел написать завещание!"];
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-window.onresize = resize; resize();
+// Состояние игры
+let plane = {
+    x: 200, y: 300, angle: 0, speed: 6, targetSpeed: 6,
+    alive: true, chassis: false, engineOk: true, parts: []
+};
 
-function init() {
-    for(let i=0; i<30; i++) clouds.push({x: Math.random()*60000, y: Math.random()*2000 - 1500, w: 120});
-    for(let i=0; i<20; i++) rivers.push({x: i * 8000 + 4000, w: 1600});
-    for(let i=0; i<15; i++) airports.push({x: i * 15000 + 1000, w: 2500});
+let cars = []; // Машины на мосту
+for(let i=0; i<5; i++) { cars.push({x: Math.random()*2000, color: 'red'}); }
 
-    for(let i=0; i<200; i++) {
-        let bx = i * 700 + 800;
-        let blocked = rivers.some(r => bx > r.x - 200 && bx < r.x + r.w + 200) || 
-                      airports.some(a => bx > a.x - 200 && bx < a.x + a.w + 200);
-        if(!blocked) buildings.push({x: bx, w: 60+Math.random()*50, h: 70+Math.random()*200});
+function startGame(type) {
+    device = type;
+    document.getElementById('overlay').style.display = 'none';
+    isGameRunning = true;
+    resize();
+    setInterval(generatePassengerMessage, 4000); // Сообщения раз в 4 сек
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+
+// Управление
+window.addEventListener('mousemove', (e) => {
+    if(!isGameRunning || !plane.alive) return;
+    const dx = e.clientX - plane.x;
+    const dy = e.clientY - plane.y;
+    plane.angle = Math.atan2(dy, dx);
+});
+
+window.addEventListener('keydown', (e) => {
+    if(e.code === 'KeyF') plane.chassis = !plane.chassis;
+});
+
+// Логика чата
+function addChatMessage(name, text) {
+    const chat = document.getElementById('messages');
+    const msg = document.createElement('div');
+    msg.innerHTML = `<span class="name">${name}:</span> ${text}`;
+    chat.appendChild(msg);
+    if(chat.childNodes.length > 6) chat.removeChild(chat.firstChild);
+}
+
+function generatePassengerMessage() {
+    if(!isGameRunning) return;
+    const name = passengerNames[Math.floor(Math.random()*passengerNames.length)];
+    const list = plane.engineOk ? phrasesNormal : phrasesPanic;
+    const text = list[Math.floor(Math.random()*list.length)];
+    addChatMessage(name, text);
+}
+
+function triggerEvent(type) {
+    if(type === 'fire') {
+        plane.engineOk = false;
+        plane.targetSpeed = 0;
+        addChatMessage("СИСТЕМА", "ОТКАЗ ДВИГАТЕЛЯ!");
+        setTimeout(() => addChatMessage("Пилот", "Спокойно, сохраняем спокойствие!"), 1000);
     }
 }
-init();
 
-window.onmousemove = (e) => { if(!plane.spaceEvent) plane.angle = Math.atan2(e.clientY - canvas.height/2, e.clientX - canvas.width/2); };
-
-function trigger(t) {
-    if(t === 'wing') plane.wing = false;
-    if(t === 'engine') plane.engine = false;
-    if(t === 'birds') { plane.engine = false; for(let i=0; i<5; i++) debris.push({x:worldX, y:worldY, vx:-10, vy:Math.random()*5, w:5, h:3, color:'brown'}); }
-    if(t === 'alien') ufo = {x: worldX + 1200, y: worldY - 600, state: 'hunt'};
-}
-
-function crash() {
-    if(plane.broken) return; plane.broken = true;
-    for(let i=0; i<30; i++) debris.push({x: worldX, y: worldY, vx: (Math.random()-0.5)*25, vy: (Math.random()-0.5)*20, w: 15, h: 8, r: 0, color: Math.random()>0.5?'#eee':'#999'});
-    for(let i=0; i<8; i++) {
-        let isDead = Math.random() > 0.5;
-        survivors.push({x: worldX + (Math.random()-0.5)*50, y: worldY, vx: (Math.random()-0.5)*10, vy: -8, dead: isDead, skin: isDead?"#444":"#ffdbac", color: `hsl(${Math.random()*360},70%,50%)`, chat: "", timer: 0, rescued: false});
+function explode() {
+    plane.alive = false;
+    for(let i=0; i<15; i++) {
+        plane.parts.push({x: plane.x, y: plane.y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15});
     }
-    setTimeout(() => { heli = {x: worldX - 1000, y: worldY - 400, targetIdx: 0, state: 'rescue', rotor: 0}; }, 4000);
-    setTimeout(() => location.reload(), 25000);
+    addChatMessage("СИСТЕМА", "СВЯЗЬ ПОТЕРЯНА...");
+    setTimeout(() => {
+        location.reload(); // Перезагрузка игры через 5 секунд
+    }, 5000);
 }
 
-function loop() {
+function draw() {
+    if(!isGameRunning) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if(!plane.broken && !plane.spaceEvent) {
-        let s = plane.engine ? plane.speed : 4;
-        worldX += Math.cos(plane.angle) * s;
-        worldY += Math.sin(plane.angle) * s;
-        if(!plane.wing) worldY += 6;
-        if(worldY < -3000) { 
-            plane.spaceEvent = true; 
-            document.getElementById('st').innerText = "VACUUM";
-            ufo = {x: worldX + 800, y: worldY - 100, state: 'abduct'}; 
+
+    // Рисуем воду/реку
+    ctx.fillStyle = "#2980b9";
+    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+
+    // Рисуем Мост
+    ctx.fillStyle = "#7f8c8d";
+    ctx.fillRect(200, canvas.height - 60, 800, 15);
+    
+    // Машины на мосту
+    ctx.fillStyle = "yellow";
+    cars.forEach(c => {
+        c.x += 2; if(c.x > 1000) c.x = 200;
+        ctx.fillRect(c.x, canvas.height - 70, 20, 10);
+    });
+
+    if(plane.alive) {
+        plane.speed += (plane.targetSpeed - plane.speed) * 0.01;
+        plane.x += Math.cos(plane.angle) * plane.speed;
+        plane.y += Math.sin(plane.angle) * plane.speed;
+
+        if(plane.y > canvas.height - 60) explode();
+
+        ctx.save();
+        ctx.translate(plane.x, plane.y);
+        ctx.rotate(plane.angle);
+        ctx.fillStyle = "white";
+        ctx.fillRect(-40, -10, 80, 20); // Фюзеляж
+        ctx.fillStyle = "#bdc3c7";
+        ctx.fillRect(-10, -35, 20, 70); // Крылья
+        if(plane.chassis) {
+            ctx.fillStyle = "black";
+            ctx.fillRect(-20, 10, 5, 10); ctx.fillRect(15, 10, 5, 10);
         }
-        camX += (worldX - camX) * 0.1; camY += (worldY - camY) * 0.1;
-        buildings.forEach(b => { if(worldX > b.x && worldX < b.x+b.w && worldY > canvas.height-100-b.h) crash(); });
-        if(worldY > canvas.height-100 && !plane.gear) crash();
-    }
-
-    let ox = canvas.width/2 - camX, oy = canvas.height/2 - camY;
-    let sky = worldY < -1800 ? "#000" : (worldY < 0 ? "#0a0a1a" : "#1e3799");
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Мир
-    ctx.fillStyle = "#27ae60"; ctx.fillRect(0, canvas.height-100 + oy, 200000, 1000);
-    rivers.forEach(r => { 
-        ctx.fillStyle = "#2980b9"; ctx.fillRect(r.x + ox, canvas.height-100 + oy, r.w, 100); 
-        ctx.fillStyle = "#95a5a6"; ctx.fillRect(r.x + ox, canvas.height-125 + oy, r.w, 25);
-    });
-    airports.forEach(a => {
-        ctx.fillStyle = "#2c3e50"; ctx.fillRect(a.x + ox, canvas.height-105 + oy, a.w, 10);
-        ctx.fillStyle = "white"; for(let j=0; j<a.w; j+=200) ctx.fillRect(a.x+ox+j, canvas.height-100+oy, 60, 5);
-    });
-    buildings.forEach(b => {
-        ctx.fillStyle = "#34495e"; ctx.fillRect(b.x+ox, canvas.height-100-b.h+oy, b.w, b.h);
-        ctx.fillStyle = "#f1c40f"; ctx.fillRect(b.x+ox+b.w/2-2, canvas.height-100-b.h+oy, 4, 4);
-    });
-
-    // Вертолет
-    if(heli) {
-        let target = survivors.find(s => !s.dead && !s.rescued);
-        if(target) {
-            heli.x += (target.x - heli.x) * 0.03;
-            heli.y += (target.y - 150 - heli.y) * 0.03;
-            if(Math.abs(heli.x - target.x) < 20) {
-                target.y -= 2; if(target.y < heli.y + 40) target.rescued = true;
-                ctx.strokeStyle = "white"; ctx.beginPath(); ctx.moveTo(heli.x+ox, heli.y+oy+10); ctx.lineTo(target.x+ox, target.y+oy); ctx.stroke();
-            }
-        } else { heli.x += 10; heli.y -= 5; }
-        heli.rotor += 0.8;
-        ctx.fillStyle = "black"; ctx.fillRect(heli.x+ox-20, heli.y+oy, 40, 20); // Тело
-        ctx.fillStyle = "gray"; ctx.save(); ctx.translate(heli.x+ox, heli.y+oy); ctx.rotate(heli.rotor); ctx.fillRect(-40, -2, 80, 4); ctx.restore();
-    }
-
-    // НЛО
-    if(ufo) {
-        ufo.x += (worldX - ufo.x) * 0.02; ufo.y += (worldY - 200 - ufo.y) * 0.02;
-        if(ufo.state === 'abduct') {
-            ctx.fillStyle = "rgba(0, 255, 0, 0.2)"; ctx.beginPath(); ctx.moveTo(ufo.x+ox, ufo.y+oy); ctx.lineTo(ufo.x+ox-100, ufo.y+oy+500); ctx.lineTo(ufo.x+ox+100, ufo.y+oy+500); ctx.fill();
-            worldY -= 1.5;
+        if(!plane.engineOk) {
+            ctx.fillStyle = "orange";
+            ctx.beginPath(); ctx.arc(-45, 0, Math.random()*20, 0, Math.PI*2); ctx.fill();
         }
-        ctx.fillStyle = "silver"; ctx.beginPath(); ctx.ellipse(ufo.x+ox, ufo.y+oy, 60, 25, 0, 0, Math.PI*2); ctx.fill();
-    }
-
-    // Кровь, обломки, люди
-    blood.forEach(b => { ctx.fillStyle = "red"; ctx.beginPath(); ctx.arc(b.x+ox, b.y+oy, 2, 0, Math.PI*2); ctx.fill(); });
-    debris.forEach(d => {
-        d.x += d.vx; d.y += d.vy; d.vy += 0.5; if(d.y > canvas.height-100) d.y = canvas.height-100;
-        ctx.fillStyle = d.color || "white"; ctx.fillRect(d.x+ox, d.y+oy, d.w, d.h);
-    });
-    survivors.forEach(s => {
-        if(!s.rescued) {
-            if(s.y < canvas.height-100) { s.x += s.vx; s.y += s.vy; s.vy += 0.4; } 
-            else { s.y = canvas.height-100; if(!s.dead) { s.timer++; if(s.timer%120===0) s.chat = phrases[Math.floor(Math.random()*phrases.length)]; if(Math.random()>0.97) blood.push({x:s.x, y:s.y}); } }
-            ctx.fillStyle = s.color; ctx.fillRect(s.x+ox-5, s.y+oy-15, 10, 15);
-            ctx.fillStyle = s.skin; ctx.fillRect(s.x+ox-4, s.y+oy-22, 8, 8);
-            if(s.chat && !s.dead) { ctx.fillStyle="white"; ctx.font="10px Arial"; ctx.fillText(s.chat, s.x+ox-20, s.y+oy-28); }
-        }
-    });
-
-    // Самолет
-    if(!plane.broken) {
-        ctx.save(); ctx.translate(worldX+ox, worldY+oy); ctx.rotate(plane.angle);
-        ctx.fillStyle = "gray"; ctx.fillRect(-10, -35, 20, plane.wing ? 70 : 35);
-        ctx.fillStyle = plane.spaceEvent ? "#b3e5fc" : "white";
-        ctx.beginPath(); ctx.ellipse(0, 0, 48, 14, 0, 0, Math.PI*2); ctx.fill();
-        if(plane.gear) { ctx.fillStyle="black"; ctx.fillRect(-15,12,6,12); ctx.fillRect(15,12,6,12); }
-        if(!plane.engine) { ctx.fillStyle="orange"; ctx.beginPath(); ctx.arc(-45, 0, 12+Math.random()*5, 0, Math.PI*2); ctx.fill(); }
         ctx.restore();
+        document.getElementById('speedVal').innerText = Math.round(plane.speed * 50);
+    } else {
+        ctx.fillStyle = "red";
+        plane.parts.forEach(p => {
+            p.x += p.vx; p.y += p.vy; p.vy += 0.3;
+            ctx.fillRect(p.x, p.y, 8, 8);
+        });
     }
 
-    document.getElementById('alt').innerText = Math.max(0, Math.floor(canvas.height-100-worldY));
-    document.getElementById('dst').innerText = Math.floor(worldX/100);
-    requestAnimationFrame(loop);
+    requestAnimationFrame(draw);
 }
-loop();
+draw();
 </script>
 </body>
 </html>
