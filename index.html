@@ -2,222 +2,172 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sky Master: Infinite World Edition</title>
+    <title>Sky Master: Extreme Optimization</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body, html { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
-        canvas { display: block; background: linear-gradient(to bottom, #4ca1af, #c4e0e5); }
-        
-        #device-select, #hangar {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #1a1a1a; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 2000; color: white;
-        }
-        #hangar { background: rgba(0,0,0,0.95); display: none; flex-wrap: wrap; flex-direction: row; }
-
-        .choice-btn { padding: 20px 40px; margin: 10px; font-size: 20px; cursor: pointer; border: none; border-radius: 10px; background: #3498db; color: white; }
-        .plane-card { width: 120px; height: 120px; margin: 8px; background: #2c3e50; border: 2px solid #7f8c8d; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
-
-        #ui { position: fixed; top: 10px; left: 10px; color: white; text-shadow: 1px 1px 2px #000; pointer-events: none; z-index: 10; font-size: 14px; }
-        .controls { position: fixed; top: 10px; right: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; z-index: 10; }
-        .btn { padding: 6px; font-size: 9px; cursor: pointer; border: 1px solid white; border-radius: 4px; color: white; background: #333; }
-        
-        #joystick-container { position: fixed; bottom: 40px; left: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; z-index: 100; touch-action: none; }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.5); border-radius: 50%; }
-        #f-btn-mobile { position: fixed; bottom: 50px; right: 40px; width: 70px; height: 70px; background: #e67e22; border-radius: 50%; display: none; z-index: 100; color: white; font-weight: bold; border: 3px solid white; justify-content: center; align-items: center; }
-
-        #chat { position: fixed; bottom: 10px; left: 180px; width: 150px; height: 80px; background: rgba(0,0,0,0.6); color: #00ff00; padding: 5px; border-radius: 8px; font-size: 10px; overflow: hidden; z-index: 5; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; }
+        #device-select, #hangar { position: fixed; inset: 0; background: #111; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: white; }
+        #hangar { background: rgba(0,0,0,0.9); display: none; flex-wrap: wrap; flex-direction: row; }
+        .choice-btn { padding: 15px 30px; margin: 10px; font-size: 20px; cursor: pointer; border-radius: 10px; border: none; background: #3498db; color: white; }
+        .plane-card { width: 100px; height: 100px; margin: 5px; background: #222; border: 2px solid #555; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; }
+        .controls { position: fixed; top: 10px; right: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; z-index: 100; }
+        .btn { padding: 5px; font-size: 10px; cursor: pointer; background: rgba(0,0,0,0.7); color: white; border: 1px solid #fff; border-radius: 4px; }
+        #ui { position: fixed; top: 10px; left: 10px; color: white; text-shadow: 1px 1px 2px #000; pointer-events: none; }
+        #joystick-container { position: fixed; bottom: 30px; left: 30px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; }
+        #joystick-stick { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: #fff; border-radius: 50%; opacity: 0.5; }
+        #f-btn { position: fixed; bottom: 30px; right: 30px; width: 70px; height: 70px; background: #e67e22; border-radius: 50%; display: none; color: white; font-weight: bold; border: 3px solid #fff; justify-content: center; align-items: center; z-index: 100; }
     </style>
 </head>
 <body>
 
 <div id="device-select">
-    <h1>ВЫБЕРИТЕ УСТРОЙСТВО</h1>
-    <button class="choice-btn" onclick="setDevice('pc')">💻 КОМПЬЮТЕР</button>
-    <button class="choice-btn" onclick="setDevice('mobile')">📱 ТЕЛЕФОН</button>
+    <h2>ВЫБЕРИТЕ УСТРОЙСТВО</h2>
+    <button class="choice-btn" onclick="start('pc')">💻 ПК</button>
+    <button class="choice-btn" onclick="start('mobile')">📱 ТЕЛЕФОН</button>
 </div>
 
-<div id="hangar">
-    <h1 style="width: 100%; text-align: center; font-size: 20px;">ВЫБЕРИТЕ САМОЛЕТ</h1>
-    <script>
-        const colors = ['white', 'yellow', 'lightgray', 'cyan', 'red', 'lime', 'orange', 'blue', 'purple'];
-        const names = ['Цессна', 'Джет', 'Боинг', 'Миг-29', 'МЧС', 'Ан-2', 'Грузовой', 'AirForce', 'UFO'];
-        for(let i=0; i<9; i++) {
-            document.write(`<div class="plane-card" onclick="selectPlane(${i})">
-                <div style="width:40px; height:12px; background:${colors[i]}; margin-bottom:8px;"></div>
-                <span style="font-size:12px;">${names[i]}</span>
-            </div>`);
-        }
-    </script>
-</div>
+<div id="hangar"></div>
 
 <div id="joystick-container"><div id="joystick-stick"></div></div>
-<div id="f-btn-mobile" onclick="toggleChassis()">F</div>
+<div id="f-btn" onclick="toggleChassis()">ШАССИ</div>
 
 <div id="ui">
-    <div id="p-name" style="font-weight: bold; color: yellow;"></div>
-    <div>H: <span id="alt">0</span> | S: <span id="speed">0</span></div>
+    <b id="p-name"></b><br>
+    Высота: <span id="alt">0</span> | Скорость: <span id="spd">0</span>
 </div>
 
 <div class="controls">
-    <button class="btn" onclick="trigger('fire')">🔥 Пожар</button>
-    <button class="btn" onclick="trigger('ufo')">🛸 НЛО</button>
-    <button class="btn" onclick="trigger('storm')">⛈️ Шторм</button>
-    <button class="btn" onclick="trigger('birds')">🦅 Птицы</button>
+    <button class="btn" onclick="trigger('fire')">🔥 Огонь</button>
     <button class="btn" onclick="trigger('engine')">⚙️ Отказ</button>
-    <button class="btn" onclick="trigger('ghost')">👻 Призрак</button>
+    <button class="btn" onclick="trigger('storm')">⛈️ Шторм</button>
+    <button class="btn" onclick="trigger('ufo')">🛸 НЛО</button>
+    <button class="btn" onclick="trigger('birds')">🦅 Птицы</button>
     <button class="btn" onclick="trigger('meteor')">☄️ Метеор</button>
-    <button class="btn" onclick="trigger('alien')">👽 Атака</button>
+    <button class="btn" onclick="trigger('ghost')">👻 Фантом</button>
+    <button class="btn" onclick="trigger('fuel')">⛽ Пусто</button>
     <button class="btn" onclick="trigger('chaos')">💀 ХАОС</button>
 </div>
 
-<div id="chat"><div id="msgs"></div></div>
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const joystick = document.getElementById('joystick-container');
-const stick = document.getElementById('joystick-stick');
-
-let deviceType = 'pc';
-let plane = { x: 500, y: 300, angle: 0, speed: 7, targetSpeed: 7, vx: 0, vy: 0, alive: true, engineOk: true, chassis: false, parts: [], fires: [], color: 'white', size: 20 };
-let firetruck = { x: -2000, active: false };
+const ctx = canvas.getContext('2d', { alpha: false }); // Оптимизация браузера
+let device = 'pc', active = false;
+let plane = { x: 500, y: 300, angle: 0, spd: 7, targetSpd: 7, alive: true, engine: true, chassis: false, color: 'white', size: 20, parts: [], fires: [] };
 let cameraX = 0, cameraY = 0, shake = 0;
-let buildings = [];
+let buildings = [], clouds = [];
 
-function setDevice(type) {
-    deviceType = type;
+function start(type) {
+    device = type;
     document.getElementById('device-select').style.display = 'none';
-    document.getElementById('hangar').style.display = 'flex';
-    if(type === 'mobile') {
-        joystick.style.display = 'block';
-        document.getElementById('f-btn-mobile').style.display = 'flex';
-    }
+    const h = document.getElementById('hangar');
+    h.style.display = 'flex';
+    const names = ['Цессна','Джет','Боинг','Миг','МЧС','Ан-2','Груз','AirF','UFO'];
+    const colors = ['#fff','#ff0','#ccc','#0ff','#f00','#0f0','#f80','#00f','#f0f'];
+    h.innerHTML = names.map((n, i) => `<div class="plane-card" onclick="select(${i},'${colors[i]}','${n}')"><div style="width:40px;height:10px;background:${colors[i]}"></div>${n}</div>`).join('');
 }
 
-function selectPlane(id) {
-    plane.color = colors[id];
-    plane.size = 15 + id * 2;
-    document.getElementById('p-name').innerText = names[id];
+function select(i, col, name) {
+    plane.color = col; plane.size = 15 + i*2;
+    document.getElementById('p-name').innerText = name;
     document.getElementById('hangar').style.display = 'none';
-    initWorld();
-}
-
-function initWorld() {
-    // Делаем землю ОЧЕНЬ большой
-    for(let i=-20000; i<20000; i+=150) {
-        // Пропускаем реку и аэропорты для домов
-        let inRiver = (i > -200 && i < 1200);
-        let inAirportL = (i > -3600 && i < -2400);
-        let inAirportR = (i > 4400 && i < 5600);
-        
-        if (!inRiver && !inAirportL && !inAirportR && Math.random() > 0.5) {
-            buildings.push({x: i, w: 30+Math.random()*30, h: 20+Math.random()*60});
-        }
+    if(device === 'mobile') {
+        document.getElementById('joystick-container').style.display = 'block';
+        document.getElementById('f-btn').style.display = 'flex';
     }
+    init(); active = true;
 }
 
-function toggleChassis() { plane.chassis = !plane.chassis; say(plane.chassis ? "Шасси выпущены" : "Шасси убраны"); }
-function trigger(type) { shake = 20; if(type==='fire') {plane.engineOk=false; plane.targetSpeed=1;} }
-function say(txt) { const m = document.getElementById('msgs'); m.innerHTML = `<div>${txt}</div>` + m.innerHTML; }
+function init() {
+    for(let i=-10000; i<10000; i+=200) {
+        if(Math.abs(i) > 1500) buildings.push({x: i, w: 40, h: 30 + Math.random()*60});
+    }
+    for(let i=0; i<20; i++) clouds.push({x: Math.random()*10000-5000, y: Math.random()*400, r: 30+Math.random()*40});
+}
+
+function toggleChassis() { plane.chassis = !plane.chassis; }
+window.addEventListener('keydown', e => { if(e.code==='KeyF') toggleChassis(); });
+
+function trigger(type) {
+    shake = 15;
+    if(type==='fire' || type==='engine' || type==='chaos') { plane.engine = false; plane.targetSpd = 2; }
+    if(type==='storm') { plane.targetSpd = 3; shake = 30; }
+    if(type==='fuel') { plane.targetSpd = 0; }
+    if(type==='birds') { plane.spd *= 0.5; plane.y += 20; }
+}
 
 // Управление
-window.addEventListener('mousemove', (e) => {
-    if(deviceType === 'pc' && plane.alive) {
-        plane.angle = Math.atan2(e.clientY - (plane.y - cameraY), e.clientX - (plane.x - cameraX));
-    }
+let joy = { active: false, x: 0, y: 0 };
+window.addEventListener('mousemove', e => {
+    if(device==='pc' && plane.alive) plane.angle = Math.atan2(e.clientY - (plane.y-cameraY), e.clientX - (plane.x-cameraX));
 });
-
-let joyActive = false;
-joystick.addEventListener('touchstart', (e) => { joyActive = true; });
-window.addEventListener('touchmove', (e) => {
-    if(joyActive && plane.alive) {
-        const rect = joystick.getBoundingClientRect();
-        const touch = e.touches[0];
-        const dx = touch.clientX - (rect.left + rect.width/2);
-        const dy = touch.clientY - (rect.top + rect.height/2);
-        const dist = Math.min(60, Math.sqrt(dx*dx + dy*dy));
-        const angle = Math.atan2(dy, dx);
-        stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-        plane.angle = angle;
-    }
-});
-window.addEventListener('touchend', () => { joyActive = false; stick.style.transform = 'translate(0,0)'; });
+canvas.addEventListener('touchstart', e => { joy.active = true; }, {passive: false});
+window.addEventListener('touchmove', e => {
+    if(!joy.active || !plane.alive) return;
+    const t = e.touches[0];
+    const rect = document.getElementById('joystick-container').getBoundingClientRect();
+    const dx = t.clientX - (rect.left + 50);
+    const dy = t.clientY - (rect.top + 50);
+    plane.angle = Math.atan2(dy, dx);
+    document.getElementById('joystick-stick').style.transform = `translate(${Math.sign(dx)*20}px, ${Math.sign(dy)*20}px)`;
+}, {passive: false});
+window.addEventListener('touchend', () => { joy.active = false; document.getElementById('joystick-stick').style.transform = 'none'; });
 
 function update() {
-    if(plane.alive && buildings.length > 0) {
-        plane.speed += (plane.targetSpeed - plane.speed) * 0.01;
-        plane.vx += (Math.cos(plane.angle) * plane.speed - plane.vx) * 0.05;
-        plane.vy += (Math.sin(plane.angle) * plane.speed + 1.2 - plane.vy) * 0.05;
-        plane.x += plane.vx; plane.y += plane.vy;
+    if(!active) return;
+    if(plane.alive) {
+        plane.spd += (plane.targetSpd - plane.spd) * 0.02;
+        plane.x += Math.cos(plane.angle) * plane.spd;
+        plane.y += Math.sin(plane.angle) * plane.spd + 1.2; // Гравитация
         if(plane.y > 585) {
-            plane.alive = false;
-            for(let i=0; i<20; i++) plane.parts.push({x: plane.x, y: plane.y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15});
-            for(let i=0; i<3; i++) plane.fires.push({x: plane.x + (Math.random()-0.5)*40, y: 590});
-            firetruck.active = true;
-            firetruck.x = plane.x + (plane.x > 0 ? 1000 : -1000);
+            plane.alive = false; shake = 40;
+            for(let i=0; i<15; i++) plane.parts.push({x:plane.x, y:plane.y, vx:(Math.random()-0.5)*10, vy:-Math.random()*10});
+            setTimeout(() => location.reload(), 3000);
         }
-    } else if(!plane.alive) {
-        plane.parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.3; if(p.y > 600) p.y = 600; });
-        if(firetruck.active) {
-            let d = plane.x - firetruck.x;
-            if(Math.abs(d) > 40) firetruck.x += Math.sign(d) * 3;
-            else if(plane.fires.length > 0 && Math.random() > 0.9) plane.fires.pop();
-            if(plane.fires.length === 0) setTimeout(()=>location.reload(), 2000);
-        }
+    } else {
+        plane.parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.4; if(p.y > 600) p.y = 600; });
     }
-    cameraX = plane.x - window.innerWidth/2;
-    cameraY = plane.y - window.innerHeight/2;
+    cameraX = plane.x - canvas.width/2; cameraY = plane.y - canvas.height/2;
     if(shake > 0) { cameraX += Math.random()*shake; cameraY += Math.random()*shake; shake *= 0.9; }
-    document.getElementById('speed').innerText = Math.round(plane.speed * 40);
-    document.getElementById('alt').innerText = Math.round(600 - plane.y);
-}
-
-function drawAirport(x) {
-    ctx.fillStyle = "#333";
-    ctx.fillRect(x, 595, 1200, 10); // Полоса
-    ctx.fillStyle = "white";
-    for(let i=0; i<12; i++) ctx.fillRect(x + 20 + i*100, 598, 40, 4); // Разметка
-    ctx.font = "bold 20px Arial";
-    ctx.fillText("RUNWAY", x + 500, 580);
+    document.getElementById('alt').innerText = Math.round(600-plane.y);
+    document.getElementById('spd').innerText = Math.round(plane.spd*40);
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.translate(-cameraX, -cameraY);
+    ctx.fillStyle = '#87CEEB'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    if(!active) { requestAnimationFrame(draw); return; }
+    ctx.save(); ctx.translate(-cameraX, -cameraY);
+    
+    // Земля и Река
+    ctx.fillStyle = '#27ae60'; ctx.fillRect(-10000, 600, 20000, 1000);
+    ctx.fillStyle = '#2980b9'; ctx.fillRect(-500, 600, 1500, 1000);
+    
+    // Облака
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    clouds.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 7); ctx.fill(); });
 
-    // ОГРОМНАЯ ЗЕМЛЯ
-    ctx.fillStyle = "#27ae60";
-    ctx.fillRect(-25000, 600, 50000, 1000);
+    // Дома
+    ctx.fillStyle = '#444';
+    buildings.forEach(b => ctx.fillRect(b.x, 600-b.h, b.w, b.h));
 
-    // РЕКА
-    ctx.fillStyle = "#2980b9";
-    ctx.fillRect(-200, 600, 1400, 1000);
-
-    // АЭРОПОРТЫ
-    drawAirport(-3600); // Левый
-    drawAirport(4400);  // Правый
-
-    buildings.forEach(b => { ctx.fillStyle = "#555"; ctx.fillRect(b.x, 600-b.h, b.w, b.h); });
-
+    // Аэропорт
+    ctx.fillStyle = '#333'; ctx.fillRect(2000, 595, 1000, 10);
+    
+    // Самолет
     if(plane.alive) {
-        ctx.save();
-        ctx.translate(plane.x, plane.y); ctx.rotate(plane.angle);
-        ctx.fillStyle = plane.color; ctx.fillRect(-plane.size, -4, plane.size*2, 8);
-        ctx.fillStyle = "#888"; ctx.fillRect(-3, -plane.size, 6, plane.size*2);
-        if(plane.chassis) { ctx.fillStyle="#000"; ctx.fillRect(-10, 4, 4, 5); ctx.fillRect(10, 4, 4, 5); }
+        ctx.save(); ctx.translate(plane.x, plane.y); ctx.rotate(plane.angle);
+        ctx.fillStyle = plane.color; ctx.fillRect(-plane.size, -5, plane.size*2, 10);
+        ctx.fillStyle = '#888'; ctx.fillRect(-2, -plane.size, 4, plane.size*2);
+        if(plane.chassis) { ctx.fillStyle='#000'; ctx.fillRect(-10, 5, 5, 5); ctx.fillRect(10, 5, 5, 5); }
+        if(!plane.engine) { ctx.fillStyle='orange'; ctx.beginPath(); ctx.arc(-plane.size,0,10,0,7); ctx.fill(); }
         ctx.restore();
     } else {
-        ctx.fillStyle = "black"; plane.parts.forEach(p => ctx.fillRect(p.x, p.y, 6, 6));
-        ctx.fillStyle = "orange"; plane.fires.forEach(f => { ctx.beginPath(); ctx.arc(f.x, f.y - 10, 8, 0, Math.PI*2); ctx.fill(); });
+        ctx.fillStyle = '#000'; plane.parts.forEach(p => ctx.fillRect(p.x, p.y, 8, 8));
     }
 
-    if(firetruck.active) { ctx.fillStyle = "red"; ctx.fillRect(firetruck.x, 585, 30, 15); }
-    ctx.restore();
-    update();
-    requestAnimationFrame(draw);
+    ctx.restore(); update(); requestAnimationFrame(draw);
 }
 canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 draw();
