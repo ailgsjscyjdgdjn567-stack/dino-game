@@ -1,176 +1,376 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Sky Master: Extreme Optimization</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>
-        body, html { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; }
-        canvas { display: block; }
-        #device-select, #hangar { position: fixed; inset: 0; background: #111; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; color: white; }
-        #hangar { background: rgba(0,0,0,0.9); display: none; flex-wrap: wrap; flex-direction: row; }
-        .choice-btn { padding: 15px 30px; margin: 10px; font-size: 20px; cursor: pointer; border-radius: 10px; border: none; background: #3498db; color: white; }
-        .plane-card { width: 100px; height: 100px; margin: 5px; background: #222; border: 2px solid #555; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; }
-        .controls { position: fixed; top: 10px; right: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; z-index: 100; }
-        .btn { padding: 5px; font-size: 10px; cursor: pointer; background: rgba(0,0,0,0.7); color: white; border: 1px solid #fff; border-radius: 4px; }
-        #ui { position: fixed; top: 10px; left: 10px; color: white; text-shadow: 1px 1px 2px #000; pointer-events: none; }
-        #joystick-container { position: fixed; bottom: 30px; left: 30px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; }
-        #joystick-stick { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: #fff; border-radius: 50%; opacity: 0.5; }
-        #f-btn { position: fixed; bottom: 30px; right: 30px; width: 70px; height: 70px; background: #e67e22; border-radius: 50%; display: none; color: white; font-weight: bold; border: 3px solid #fff; justify-content: center; align-items: center; z-index: 100; }
-    </style>
+<meta charset="UTF-8">
+<title>Airplane Sandbox</title>
+<style>
+
+body{
+margin:0;
+overflow:hidden;
+font-family:Arial;
+background:#87CEEB;
+}
+
+canvas{
+display:none;
+}
+
+.menu{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:white;
+padding:25px;
+border-radius:12px;
+text-align:center;
+box-shadow:0 10px 25px rgba(0,0,0,0.2);
+}
+
+button{
+padding:10px 16px;
+margin:6px;
+font-size:16px;
+border:none;
+border-radius:6px;
+background:#2d89ef;
+color:white;
+cursor:pointer;
+}
+
+#hud{
+position:fixed;
+top:10px;
+left:10px;
+background:#ffffffcc;
+padding:10px;
+border-radius:8px;
+display:none;
+}
+
+#minimap{
+position:fixed;
+right:10px;
+bottom:10px;
+width:200px;
+height:120px;
+background:#ffffffcc;
+border-radius:8px;
+display:none;
+}
+
+</style>
 </head>
+
 <body>
 
-<div id="device-select">
-    <h2>ВЫБЕРИТЕ УСТРОЙСТВО</h2>
-    <button class="choice-btn" onclick="start('pc')">💻 ПК</button>
-    <button class="choice-btn" onclick="start('mobile')">📱 ТЕЛЕФОН</button>
+<div id="menu" class="menu">
+<h2>✈️ Airplane Sandbox</h2>
+<button onclick="openHangar()">Играть</button>
 </div>
 
-<div id="hangar"></div>
+<div id="hangar" class="menu" style="display:none">
+<h2>Ангар</h2>
 
-<div id="joystick-container"><div id="joystick-stick"></div></div>
-<div id="f-btn" onclick="toggleChassis()">ШАССИ</div>
+<button onclick="startGame('fighter')">Истребитель</button>
+<button onclick="startGame('cargo')">Грузовой</button>
+<button onclick="startGame('jet')">Реактивный</button>
+<button onclick="startGame('old')">Старый самолёт</button>
 
-<div id="ui">
-    <b id="p-name"></b><br>
-    Высота: <span id="alt">0</span> | Скорость: <span id="spd">0</span>
 </div>
 
-<div class="controls">
-    <button class="btn" onclick="trigger('fire')">🔥 Огонь</button>
-    <button class="btn" onclick="trigger('engine')">⚙️ Отказ</button>
-    <button class="btn" onclick="trigger('storm')">⛈️ Шторм</button>
-    <button class="btn" onclick="trigger('ufo')">🛸 НЛО</button>
-    <button class="btn" onclick="trigger('birds')">🦅 Птицы</button>
-    <button class="btn" onclick="trigger('meteor')">☄️ Метеор</button>
-    <button class="btn" onclick="trigger('ghost')">👻 Фантом</button>
-    <button class="btn" onclick="trigger('fuel')">⛽ Пусто</button>
-    <button class="btn" onclick="trigger('chaos')">💀 ХАОС</button>
+<div id="hud">
+W / S — тяга<br>
+F — шасси<br>
+Мышка — управление
 </div>
 
 <canvas id="game"></canvas>
+<canvas id="minimap"></canvas>
 
 <script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d', { alpha: false }); // Оптимизация браузера
-let device = 'pc', active = false;
-let plane = { x: 500, y: 300, angle: 0, spd: 7, targetSpd: 7, alive: true, engine: true, chassis: false, color: 'white', size: 20, parts: [], fires: [] };
-let cameraX = 0, cameraY = 0, shake = 0;
-let buildings = [], clouds = [];
 
-function start(type) {
-    device = type;
-    document.getElementById('device-select').style.display = 'none';
-    const h = document.getElementById('hangar');
-    h.style.display = 'flex';
-    const names = ['Цессна','Джет','Боинг','Миг','МЧС','Ан-2','Груз','AirF','UFO'];
-    const colors = ['#fff','#ff0','#ccc','#0ff','#f00','#0f0','#f80','#00f','#f0f'];
-    h.innerHTML = names.map((n, i) => `<div class="plane-card" onclick="select(${i},'${colors[i]}','${n}')"><div style="width:40px;height:10px;background:${colors[i]}"></div>${n}</div>`).join('');
+const canvas = document.getElementById("game")
+const ctx = canvas.getContext("2d")
+
+const minimap = document.getElementById("minimap")
+const mctx = minimap.getContext("2d")
+
+function resize(){
+canvas.width = window.innerWidth
+canvas.height = window.innerHeight
 }
 
-function select(i, col, name) {
-    plane.color = col; plane.size = 15 + i*2;
-    document.getElementById('p-name').innerText = name;
-    document.getElementById('hangar').style.display = 'none';
-    if(device === 'mobile') {
-        document.getElementById('joystick-container').style.display = 'block';
-        document.getElementById('f-btn').style.display = 'flex';
-    }
-    init(); active = true;
+window.addEventListener("resize", resize)
+
+let worldWidth = 6000
+let worldHeight = 2000
+
+let camera = {x:0,y:0}
+
+let plane
+let planeType = "fighter"
+
+let mouse = {x:0,y:0}
+
+let clouds = []
+let debris = []
+
+let runway = {x:2000,y:1800,width:500,height:20}
+
+function openHangar(){
+
+document.getElementById("menu").style.display="none"
+document.getElementById("hangar").style.display="block"
+
 }
 
-function init() {
-    for(let i=-10000; i<10000; i+=200) {
-        if(Math.abs(i) > 1500) buildings.push({x: i, w: 40, h: 30 + Math.random()*60});
-    }
-    for(let i=0; i<20; i++) clouds.push({x: Math.random()*10000-5000, y: Math.random()*400, r: 30+Math.random()*40});
+function startGame(type){
+
+planeType = type
+
+document.getElementById("hangar").style.display="none"
+document.getElementById("hud").style.display="block"
+
+canvas.style.display="block"
+minimap.style.display="block"
+
+resize()
+
+initPlane()
+createClouds()
+
+loop()
+
 }
 
-function toggleChassis() { plane.chassis = !plane.chassis; }
-window.addEventListener('keydown', e => { if(e.code==='KeyF') toggleChassis(); });
+function initPlane(){
 
-function trigger(type) {
-    shake = 15;
-    if(type==='fire' || type==='engine' || type==='chaos') { plane.engine = false; plane.targetSpd = 2; }
-    if(type==='storm') { plane.targetSpd = 3; shake = 30; }
-    if(type==='fuel') { plane.targetSpd = 0; }
-    if(type==='birds') { plane.spd *= 0.5; plane.y += 20; }
+let stats={
+fighter:{speed:1.2,color:"gray"},
+cargo:{speed:0.7,color:"darkgreen"},
+jet:{speed:1.7,color:"black"},
+old:{speed:0.9,color:"brown"}
 }
 
-// Управление
-let joy = { active: false, x: 0, y: 0 };
-window.addEventListener('mousemove', e => {
-    if(device==='pc' && plane.alive) plane.angle = Math.atan2(e.clientY - (plane.y-cameraY), e.clientX - (plane.x-cameraX));
-});
-canvas.addEventListener('touchstart', e => { joy.active = true; }, {passive: false});
-window.addEventListener('touchmove', e => {
-    if(!joy.active || !plane.alive) return;
-    const t = e.touches[0];
-    const rect = document.getElementById('joystick-container').getBoundingClientRect();
-    const dx = t.clientX - (rect.left + 50);
-    const dy = t.clientY - (rect.top + 50);
-    plane.angle = Math.atan2(dy, dx);
-    document.getElementById('joystick-stick').style.transform = `translate(${Math.sign(dx)*20}px, ${Math.sign(dy)*20}px)`;
-}, {passive: false});
-window.addEventListener('touchend', () => { joy.active = false; document.getElementById('joystick-stick').style.transform = 'none'; });
+let s=stats[planeType]
 
-function update() {
-    if(!active) return;
-    if(plane.alive) {
-        plane.spd += (plane.targetSpd - plane.spd) * 0.02;
-        plane.x += Math.cos(plane.angle) * plane.spd;
-        plane.y += Math.sin(plane.angle) * plane.spd + 1.2; // Гравитация
-        if(plane.y > 585) {
-            plane.alive = false; shake = 40;
-            for(let i=0; i<15; i++) plane.parts.push({x:plane.x, y:plane.y, vx:(Math.random()-0.5)*10, vy:-Math.random()*10});
-            setTimeout(() => location.reload(), 3000);
-        }
-    } else {
-        plane.parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.4; if(p.y > 600) p.y = 600; });
-    }
-    cameraX = plane.x - canvas.width/2; cameraY = plane.y - canvas.height/2;
-    if(shake > 0) { cameraX += Math.random()*shake; cameraY += Math.random()*shake; shake *= 0.9; }
-    document.getElementById('alt').innerText = Math.round(600-plane.y);
-    document.getElementById('spd').innerText = Math.round(plane.spd*40);
+plane={
+x:300,
+y:300,
+vx:0,
+vy:0,
+thrust:0,
+angle:0,
+gear:true,
+hp:100,
+speed:s.speed,
+color:s.color
 }
 
-function draw() {
-    ctx.fillStyle = '#87CEEB'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    if(!active) { requestAnimationFrame(draw); return; }
-    ctx.save(); ctx.translate(-cameraX, -cameraY);
-    
-    // Земля и Река
-    ctx.fillStyle = '#27ae60'; ctx.fillRect(-10000, 600, 20000, 1000);
-    ctx.fillStyle = '#2980b9'; ctx.fillRect(-500, 600, 1500, 1000);
-    
-    // Облака
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    clouds.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 7); ctx.fill(); });
-
-    // Дома
-    ctx.fillStyle = '#444';
-    buildings.forEach(b => ctx.fillRect(b.x, 600-b.h, b.w, b.h));
-
-    // Аэропорт
-    ctx.fillStyle = '#333'; ctx.fillRect(2000, 595, 1000, 10);
-    
-    // Самолет
-    if(plane.alive) {
-        ctx.save(); ctx.translate(plane.x, plane.y); ctx.rotate(plane.angle);
-        ctx.fillStyle = plane.color; ctx.fillRect(-plane.size, -5, plane.size*2, 10);
-        ctx.fillStyle = '#888'; ctx.fillRect(-2, -plane.size, 4, plane.size*2);
-        if(plane.chassis) { ctx.fillStyle='#000'; ctx.fillRect(-10, 5, 5, 5); ctx.fillRect(10, 5, 5, 5); }
-        if(!plane.engine) { ctx.fillStyle='orange'; ctx.beginPath(); ctx.arc(-plane.size,0,10,0,7); ctx.fill(); }
-        ctx.restore();
-    } else {
-        ctx.fillStyle = '#000'; plane.parts.forEach(p => ctx.fillRect(p.x, p.y, 8, 8));
-    }
-
-    ctx.restore(); update(); requestAnimationFrame(draw);
 }
-canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-draw();
+
+function createClouds(){
+
+for(let i=0;i<40;i++){
+
+clouds.push({
+x:Math.random()*worldWidth,
+y:Math.random()*800,
+size:40+Math.random()*80
+})
+
+}
+
+}
+
+document.addEventListener("mousemove",e=>{
+mouse.x=e.clientX
+mouse.y=e.clientY
+})
+
+document.addEventListener("keydown",e=>{
+
+if(e.key==="w") plane.thrust+=0.05
+if(e.key==="s") plane.thrust-=0.05
+if(e.key==="f") plane.gear=!plane.gear
+
+})
+
+function update(){
+
+plane.angle=Math.atan2(
+mouse.y-(plane.y-camera.y),
+mouse.x-(plane.x-camera.x)
+)
+
+plane.vx+=Math.cos(plane.angle)*plane.thrust*plane.speed
+plane.vy+=Math.sin(plane.angle)*plane.thrust*plane.speed
+
+plane.vy+=0.2
+
+plane.x+=plane.vx
+plane.y+=plane.vy
+
+plane.vx*=0.99
+plane.vy*=0.99
+
+if(plane.y>1800){
+
+if(Math.abs(plane.vy)>6 || !plane.gear){
+crashPlane()
+}
+
+plane.y=1800
+plane.vy=0
+
+}
+
+camera.x=plane.x-canvas.width/2
+camera.y=plane.y-canvas.height/2
+
+}
+
+function crashPlane(){
+
+if(plane.hp<=0) return
+
+plane.hp=0
+
+for(let i=0;i<12;i++){
+
+debris.push({
+x:plane.x,
+y:plane.y,
+vx:(Math.random()-0.5)*8,
+vy:(Math.random()-0.5)*8
+})
+
+}
+
+}
+
+function updateDebris(){
+
+debris.forEach(d=>{
+d.vy+=0.2
+d.x+=d.vx
+d.y+=d.vy
+})
+
+}
+
+function drawClouds(){
+
+ctx.fillStyle="white"
+
+clouds.forEach(c=>{
+ctx.beginPath()
+ctx.arc(c.x-camera.x,c.y-camera.y,c.size,0,Math.PI*2)
+ctx.fill()
+})
+
+}
+
+function drawRunway(){
+
+ctx.fillStyle="#555"
+ctx.fillRect(runway.x-camera.x,runway.y-camera.y,runway.width,runway.height)
+
+}
+
+function drawPlane(){
+
+ctx.save()
+
+ctx.translate(plane.x-camera.x,plane.y-camera.y)
+ctx.rotate(plane.angle)
+
+ctx.fillStyle=plane.color
+ctx.fillRect(-25,-6,50,12)
+
+ctx.fillStyle="red"
+ctx.fillRect(-35,-3,10,6)
+
+if(plane.gear){
+
+ctx.fillStyle="black"
+ctx.fillRect(-10,6,6,10)
+ctx.fillRect(4,6,6,10)
+
+}
+
+ctx.restore()
+
+}
+
+function drawGround(){
+
+ctx.fillStyle="#3c9a3c"
+ctx.fillRect(-camera.x,1800-camera.y,worldWidth,200)
+
+}
+
+function drawDebris(){
+
+ctx.fillStyle="black"
+
+debris.forEach(d=>{
+ctx.fillRect(d.x-camera.x,d.y-camera.y,6,6)
+})
+
+}
+
+function drawMinimap(){
+
+mctx.clearRect(0,0,minimap.width,minimap.height)
+
+let scaleX=minimap.width/worldWidth
+let scaleY=minimap.height/worldHeight
+
+mctx.fillStyle="green"
+mctx.fillRect(0,1800*scaleY,minimap.width,20)
+
+mctx.fillStyle="red"
+mctx.fillRect(plane.x*scaleX,plane.y*scaleY,4,4)
+
+}
+
+function drawHUD(){
+
+ctx.fillStyle="black"
+
+ctx.fillText("HP: "+plane.hp,20,20)
+ctx.fillText("Thrust: "+plane.thrust.toFixed(2),20,40)
+ctx.fillText("Gear: "+(plane.gear?"ON":"OFF"),20,60)
+
+}
+
+function loop(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
+
+update()
+updateDebris()
+
+drawClouds()
+drawRunway()
+drawGround()
+
+if(plane.hp>0){
+drawPlane()
+}
+
+drawDebris()
+drawHUD()
+drawMinimap()
+
+requestAnimationFrame(loop)
+
+}
+
 </script>
+
 </body>
 </html>
