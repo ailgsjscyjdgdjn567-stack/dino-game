@@ -1,372 +1,381 @@
 <!DOCTYPE html>
-<html lang="ru">
+
+<html lang="ky">
 <head>
 <meta charset="UTF-8">
-<title>Airplane Sandbox</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Онлайн мектеп</title>
+
 <style>
 
 body{
-margin:0;
-overflow:hidden;
 font-family:Arial;
-background:#87CEEB;
-}
-
-canvas{
-display:none;
-}
-
-.menu{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-background:white;
-padding:25px;
-border-radius:12px;
+margin:0;
+background:linear-gradient(135deg,#6a5cff,#8f7bff,#b3a8ff);
 text-align:center;
-box-shadow:0 10px 25px rgba(0,0,0,0.2);
+overflow-x:hidden;
+}
+
+/* учкан иконкалар */
+
+.floating{
+position:fixed;
+width:100%;
+height:100%;
+top:0;
+left:0;
+pointer-events:none;
+}
+
+.icon{
+position:absolute;
+font-size:30px;
+animation:fly 12s linear infinite;
+opacity:0.7;
+}
+
+.icon:nth-child(1){left:10%}
+.icon:nth-child(2){left:30%}
+.icon:nth-child(3){left:50%}
+.icon:nth-child(4){left:70%}
+.icon:nth-child(5){left:90%}
+
+@keyframes fly{
+0%{transform:translateY(100vh) rotate(0deg)}
+100%{transform:translateY(-100vh) rotate(360deg)}
+}
+
+header{
+background:#4f46ff;
+color:white;
+padding:15px;
+font-size:20px;
+}
+
+.box{
+background:white;
+width:92%;
+max-width:520px;
+margin:20px auto;
+padding:20px;
+border-radius:14px;
+box-shadow:0 10px 25px rgba(0,0,0,0.25);
 }
 
 button{
-padding:10px 16px;
-margin:6px;
+width:100%;
+padding:12px;
+margin-top:10px;
 font-size:16px;
-border:none;
-border-radius:6px;
-background:#2d89ef;
+background:#5a54ff;
 color:white;
-cursor:pointer;
+border:none;
+border-radius:8px;
 }
 
-#hud{
-position:fixed;
-top:10px;
-left:10px;
-background:#ffffffcc;
+.exit{background:#ff4d4d}
+.restart{background:#00a86b}
+
+input{
+width:90%;
 padding:10px;
-border-radius:8px;
-display:none;
+margin:8px;
+font-size:16px;
 }
 
-#minimap{
-position:fixed;
-right:10px;
-bottom:10px;
-width:200px;
-height:120px;
-background:#ffffffcc;
-border-radius:8px;
-display:none;
+.q{text-align:left;margin-top:15px}
+
+table{
+width:100%;
+border-collapse:collapse;
+}
+
+td,th{
+border:1px solid #ccc;
+padding:8px;
+}
+
+#timer{
+font-size:20px;
+color:red;
+margin-bottom:10px;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<div id="menu" class="menu">
-<h2>✈️ Airplane Sandbox</h2>
-<button onclick="openHangar()">Играть</button>
+<div class="floating">
+<div class="icon">📚</div>
+<div class="icon">✏️</div>
+<div class="icon">📖</div>
+<div class="icon">🎒</div>
+<div class="icon">📐</div>
 </div>
 
-<div id="hangar" class="menu" style="display:none">
-<h2>Ангар</h2>
+<header>📚 Онлайн мектеп</header>
 
-<button onclick="startGame('fighter')">Истребитель</button>
-<button onclick="startGame('cargo')">Грузовой</button>
-<button onclick="startGame('jet')">Реактивный</button>
-<button onclick="startGame('old')">Старый самолёт</button>
+<div class="box" id="start">
+<h3>Ким кирет?</h3>
+<button onclick="openTeacher()">👨‍🏫 Мугалим</button>
+<button onclick="openStudent()">👦 Окуучу</button>
+</div>
+
+<div class="box" id="teacherLogin" style="display:none">
+<h3>Мугалим</h3>
+<input id="tname" placeholder="ФИО">
+<input type="password" placeholder="ПИН код">
+<button onclick="enterTeacher()">Кирүү</button>
+<button class="exit" onclick="home()">Выйти</button>
+</div>
+
+<div class="box" id="studentLogin" style="display:none">
+<h3>Окуучу</h3>
+<input id="sname" placeholder="ФИО">
+<input type="password" placeholder="ПИН код">
+<button onclick="enterStudent()">Баштоо</button>
+<button class="exit" onclick="home()">Выйти</button>
+</div>
+
+<div class="box" id="subjects" style="display:none">
+<h3>Предмет тандоо</h3>
+<button onclick="startTest('math')">Математика</button>
+<button onclick="startTest('ru')">Орус тили</button>
+<button onclick="startTest('kg')">Кыргыз тили</button>
+<button onclick="startTest('lit')">Адабий окуу</button>
+<button onclick="startTest('meken')">Мекен таануу</button>
+<button class="exit" onclick="home()">Выйти</button>
+</div>
+
+<div class="box" id="test" style="display:none">
+<h3 id="subjectTitle"></h3>
+
+<div id="timer">⏱ Убакыт: 10:00</div>
+
+<div id="questionBox"></div>
+
+<button onclick="finish()">Жыйынтык</button> <button class="exit" onclick="home()">Выйти</button>
+
+<p id="result"></p>
+<div id="restartArea"></div>
 
 </div>
 
-<div id="hud">
-W / S — тяга<br>
-F — шасси<br>
-Мышка — управление
-</div>
+<div class="box" id="journal" style="display:none">
+<h3>Мугалим журналы</h3>
 
-<canvas id="game"></canvas>
-<canvas id="minimap"></canvas>
+<table>
+<thead>
+<tr>
+<th>Окуучу</th>
+<th>Предмет</th>
+<th>Балл</th>
+<th>Баа</th>
+</tr>
+</thead>
+
+<tbody id="table"></tbody>
+
+</table>
+
+<button class="exit" onclick="home()">Выйти</button>
+
+</div>
 
 <script>
 
-const canvas = document.getElementById("game")
-const ctx = canvas.getContext("2d")
+let results=[]
+let questions=[]
+let subjectName=""
+let currentKey=""
 
-const minimap = document.getElementById("minimap")
-const mctx = minimap.getContext("2d")
+let time=600
+let timerInterval
 
-function resize(){
-canvas.width = window.innerWidth
-canvas.height = window.innerHeight
-}
+const data={
 
-window.addEventListener("resize", resize)
+math:{name:"Математика",q:[
+{q:"5+5=?",a:["8","9","10","11"],c:2},
+{q:"7+3=?",a:["8","9","10","11"],c:2},
+{q:"9-4=?",a:["5","6","7","4"],c:0}
+]},
 
-let worldWidth = 6000
-let worldHeight = 2000
+ru:{name:"Орус тили",q:[
+{q:"Слово мама канча тамга?",a:["3","4","5","6"],c:1}
+]},
 
-let camera = {x:0,y:0}
+kg:{name:"Кыргыз тили",q:[
+{q:"Кыргыз тили кайсы?",a:["орус","кыргыз","англис","кытай"],c:1}
+]},
 
-let plane
-let planeType = "fighter"
+lit:{name:"Адабий окуу",q:[
+{q:"Китепти ким жазат?",a:["жазуучу","айдоочу","доктур","мугалим"],c:0}
+]},
 
-let mouse = {x:0,y:0}
-
-let clouds = []
-let debris = []
-
-let runway = {x:2000,y:1800,width:500,height:20}
-
-function openHangar(){
-
-document.getElementById("menu").style.display="none"
-document.getElementById("hangar").style.display="block"
-
-}
-
-function startGame(type){
-
-planeType = type
-
-document.getElementById("hangar").style.display="none"
-document.getElementById("hud").style.display="block"
-
-canvas.style.display="block"
-minimap.style.display="block"
-
-resize()
-
-initPlane()
-createClouds()
-
-loop()
+meken:{name:"Мекен таануу",q:[
+{q:"Кыргызстандын борбору?",a:["Ош","Бишкек","Нарын","Талас"],c:1}
+]}
 
 }
 
-function initPlane(){
+function home(){
 
-let stats={
-fighter:{speed:1.2,color:"gray"},
-cargo:{speed:0.7,color:"darkgreen"},
-jet:{speed:1.7,color:"black"},
-old:{speed:0.9,color:"brown"}
-}
+start.style.display="block"
+teacherLogin.style.display="none"
+studentLogin.style.display="none"
+subjects.style.display="none"
+test.style.display="none"
+journal.style.display="none"
 
-let s=stats[planeType]
-
-plane={
-x:300,
-y:300,
-vx:0,
-vy:0,
-thrust:0,
-angle:0,
-gear:true,
-hp:100,
-speed:s.speed,
-color:s.color
-}
+clearInterval(timerInterval)
 
 }
 
-function createClouds(){
+function openTeacher(){
+start.style.display="none"
+teacherLogin.style.display="block"
+}
 
-for(let i=0;i<40;i++){
+function openStudent(){
+start.style.display="none"
+studentLogin.style.display="block"
+}
 
-clouds.push({
-x:Math.random()*worldWidth,
-y:Math.random()*800,
-size:40+Math.random()*80
+function enterTeacher(){
+teacherLogin.style.display="none"
+journal.style.display="block"
+updateJournal()
+}
+
+function enterStudent(){
+studentLogin.style.display="none"
+subjects.style.display="block"
+}
+
+function startTimer(){
+
+time=600
+
+timerInterval=setInterval(()=>{
+
+time--
+
+let m=Math.floor(time/60)
+let s=time%60
+
+if(s<10)s="0"+s
+
+timer.innerText="⏱ Убакыт: "+m+":"+s
+
+if(time<=0){
+
+clearInterval(timerInterval)
+alert("Убакыт бүттү")
+finish()
+
+}
+
+},1000)
+
+}
+
+function startTest(key){
+
+currentKey=key
+
+let d=data[key]
+
+subjectName=d.name
+questions=d.q
+
+subjects.style.display="none"
+test.style.display="block"
+
+subjectTitle.innerText=d.name
+
+startTimer()
+
+let html=""
+
+questions.forEach((q,i)=>{
+
+html+="<div class='q'>"+(i+1)+") "+q.q+"<br>"
+
+q.a.forEach((o,j)=>{
+
+html+="<label><input type='radio' name='q"+i+"' value='"+j+"'> "+o+"</label><br>"
+
 })
 
-}
-
-}
-
-document.addEventListener("mousemove",e=>{
-mouse.x=e.clientX
-mouse.y=e.clientY
-})
-
-document.addEventListener("keydown",e=>{
-
-if(e.key==="w") plane.thrust+=0.05
-if(e.key==="s") plane.thrust-=0.05
-if(e.key==="f") plane.gear=!plane.gear
+html+="</div>"
 
 })
 
-function update(){
-
-plane.angle=Math.atan2(
-mouse.y-(plane.y-camera.y),
-mouse.x-(plane.x-camera.x)
-)
-
-plane.vx+=Math.cos(plane.angle)*plane.thrust*plane.speed
-plane.vy+=Math.sin(plane.angle)*plane.thrust*plane.speed
-
-plane.vy+=0.2
-
-plane.x+=plane.vx
-plane.y+=plane.vy
-
-plane.vx*=0.99
-plane.vy*=0.99
-
-if(plane.y>1800){
-
-if(Math.abs(plane.vy)>6 || !plane.gear){
-crashPlane()
-}
-
-plane.y=1800
-plane.vy=0
+questionBox.innerHTML=html
 
 }
 
-camera.x=plane.x-canvas.width/2
-camera.y=plane.y-canvas.height/2
+function finish(){
 
+clearInterval(timerInterval)
+
+let score=0
+
+questions.forEach((q,i)=>{
+
+let a=document.querySelector("input[name='q"+i+"']:checked")
+
+if(a && parseInt(a.value)==q.c){
+score++
 }
 
-function crashPlane(){
-
-if(plane.hp<=0) return
-
-plane.hp=0
-
-for(let i=0;i<12;i++){
-
-debris.push({
-x:plane.x,
-y:plane.y,
-vx:(Math.random()-0.5)*8,
-vy:(Math.random()-0.5)*8
 })
 
+let grade=2
+
+if(score>=3)grade=5
+else if(score==2)grade=4
+else if(score==1)grade=3
+
+let msg="Балл: "+score+" | Баа: "+grade
+
+if(grade==2){
+msg+=" 😅 Сен двойичниксинбы?"
 }
 
-}
+result.innerText=msg
 
-function updateDebris(){
+restartArea.innerHTML="<button class='restart' onclick='startTest(currentKey)'>🔄 Кайра баштоо</button>"
 
-debris.forEach(d=>{
-d.vy+=0.2
-d.x+=d.vx
-d.y+=d.vy
+results.push({
+name:sname.value,
+subject:subjectName,
+score:score,
+grade:grade
 })
 
+updateJournal()
+
 }
 
-function drawClouds(){
+function updateJournal(){
 
-ctx.fillStyle="white"
+table.innerHTML=""
 
-clouds.forEach(c=>{
-ctx.beginPath()
-ctx.arc(c.x-camera.x,c.y-camera.y,c.size,0,Math.PI*2)
-ctx.fill()
+results.forEach(r=>{
+
+table.innerHTML+=`
+<tr>
+<td>${r.name}</td>
+<td>${r.subject}</td>
+<td>${r.score}</td>
+<td>${r.grade}</td>
+</tr>
+`
+
 })
-
-}
-
-function drawRunway(){
-
-ctx.fillStyle="#555"
-ctx.fillRect(runway.x-camera.x,runway.y-camera.y,runway.width,runway.height)
-
-}
-
-function drawPlane(){
-
-ctx.save()
-
-ctx.translate(plane.x-camera.x,plane.y-camera.y)
-ctx.rotate(plane.angle)
-
-ctx.fillStyle=plane.color
-ctx.fillRect(-25,-6,50,12)
-
-ctx.fillStyle="red"
-ctx.fillRect(-35,-3,10,6)
-
-if(plane.gear){
-
-ctx.fillStyle="black"
-ctx.fillRect(-10,6,6,10)
-ctx.fillRect(4,6,6,10)
-
-}
-
-ctx.restore()
-
-}
-
-function drawGround(){
-
-ctx.fillStyle="#3c9a3c"
-ctx.fillRect(-camera.x,1800-camera.y,worldWidth,200)
-
-}
-
-function drawDebris(){
-
-ctx.fillStyle="black"
-
-debris.forEach(d=>{
-ctx.fillRect(d.x-camera.x,d.y-camera.y,6,6)
-})
-
-}
-
-function drawMinimap(){
-
-mctx.clearRect(0,0,minimap.width,minimap.height)
-
-let scaleX=minimap.width/worldWidth
-let scaleY=minimap.height/worldHeight
-
-mctx.fillStyle="green"
-mctx.fillRect(0,1800*scaleY,minimap.width,20)
-
-mctx.fillStyle="red"
-mctx.fillRect(plane.x*scaleX,plane.y*scaleY,4,4)
-
-}
-
-function drawHUD(){
-
-ctx.fillStyle="black"
-
-ctx.fillText("HP: "+plane.hp,20,20)
-ctx.fillText("Thrust: "+plane.thrust.toFixed(2),20,40)
-ctx.fillText("Gear: "+(plane.gear?"ON":"OFF"),20,60)
-
-}
-
-function loop(){
-
-ctx.clearRect(0,0,canvas.width,canvas.height)
-
-update()
-updateDebris()
-
-drawClouds()
-drawRunway()
-drawGround()
-
-if(plane.hp>0){
-drawPlane()
-}
-
-drawDebris()
-drawHUD()
-drawMinimap()
-
-requestAnimationFrame(loop)
 
 }
 
