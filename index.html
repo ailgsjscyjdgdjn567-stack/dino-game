@@ -13,86 +13,60 @@ font-family:Arial;
 margin:0;
 background:linear-gradient(135deg,#6a5cff,#8f7bff,#b3a8ff);
 text-align:center;
-overflow-x:hidden;
-}
-
-/* учкан иконкалар */
-
-.floating{
-position:fixed;
-width:100%;
-height:100%;
-top:0;
-left:0;
-pointer-events:none;
-}
-
-.icon{
-position:absolute;
-font-size:30px;
-animation:fly 12s linear infinite;
-opacity:0.7;
-}
-
-.icon:nth-child(1){left:10%}
-.icon:nth-child(2){left:30%}
-.icon:nth-child(3){left:50%}
-.icon:nth-child(4){left:70%}
-.icon:nth-child(5){left:90%}
-
-@keyframes fly{
-0%{transform:translateY(100vh) rotate(0deg)}
-100%{transform:translateY(-100vh) rotate(360deg)}
 }
 
 header{
 background:#4f46ff;
 color:white;
 padding:15px;
-font-size:20px;
+font-size:22px;
 }
 
 .box{
 background:white;
-width:92%;
+width:95%;
 max-width:520px;
 margin:20px auto;
 padding:20px;
 border-radius:14px;
-box-shadow:0 10px 25px rgba(0,0,0,0.25);
+box-shadow:0 10px 25px rgba(0,0,0,0.2);
 }
 
 button{
 width:100%;
-padding:12px;
+padding:16px;
 margin-top:10px;
-font-size:16px;
+font-size:18px;
 background:#5a54ff;
 color:white;
 border:none;
+border-radius:10px;
+}
+
+.next{
+background:#00a86b;
+}
+
+.restart{
+background:#ff8c00;
+}
+
+.q{
+text-align:left;
+font-size:18px;
+margin-top:10px;
+}
+
+label{
+display:block;
+padding:10px;
+background:#f3f3f3;
+margin-top:6px;
 border-radius:8px;
 }
 
-.exit{background:#ff4d4d}
-.restart{background:#00a86b}
-
-input{
-width:90%;
-padding:10px;
-margin:8px;
-font-size:16px;
-}
-
-.q{text-align:left;margin-top:15px}
-
-table{
-width:100%;
-border-collapse:collapse;
-}
-
-td,th{
-border:1px solid #ccc;
-padding:8px;
+input[type="radio"]{
+margin-right:10px;
 }
 
 #timer{
@@ -107,151 +81,136 @@ margin-bottom:10px;
 
 <body>
 
-<div class="floating">
-<div class="icon">📚</div>
-<div class="icon">✏️</div>
-<div class="icon">📖</div>
-<div class="icon">🎒</div>
-<div class="icon">📐</div>
-</div>
-
 <header>📚 Онлайн мектеп</header>
 
 <div class="box" id="start">
-<h3>Ким кирет?</h3>
-<button onclick="openTeacher()">👨‍🏫 Мугалим</button>
-<button onclick="openStudent()">👦 Окуучу</button>
-</div>
 
-<div class="box" id="teacherLogin" style="display:none">
-<h3>Мугалим</h3>
-<input id="tname" placeholder="ФИО">
-<input type="password" placeholder="ПИН код">
-<button onclick="enterTeacher()">Кирүү</button>
-<button class="exit" onclick="home()">Выйти</button>
+<h3>Ким кирет?</h3>
+
+<button onclick="openStudent()">👦 Окуучу</button>
+
 </div>
 
 <div class="box" id="studentLogin" style="display:none">
+
 <h3>Окуучу</h3>
-<input id="sname" placeholder="ФИО">
-<input type="password" placeholder="ПИН код">
+
+<input id="sname" placeholder="ФИО" style="width:90%;padding:12px;font-size:16px">
+
 <button onclick="enterStudent()">Баштоо</button>
-<button class="exit" onclick="home()">Выйти</button>
+
 </div>
 
 <div class="box" id="subjects" style="display:none">
+
 <h3>Предмет тандоо</h3>
-<button onclick="startTest('math')">Математика</button>
-<button onclick="startTest('ru')">Орус тили</button>
-<button onclick="startTest('kg')">Кыргыз тили</button>
-<button onclick="startTest('lit')">Адабий окуу</button>
-<button onclick="startTest('meken')">Мекен таануу</button>
-<button class="exit" onclick="home()">Выйти</button>
+
+<button onclick="startTest('math')">➕ Математика</button> <button onclick="startTest('ru')">🇷🇺 Орус тили</button> <button onclick="startTest('kg')">🇰🇬 Кыргыз тили</button> <button onclick="startTest('lit')">📖 Адабий окуу</button> <button onclick="startTest('meken')">🌍 Мекен таануу</button>
+
 </div>
 
 <div class="box" id="test" style="display:none">
+
 <h3 id="subjectTitle"></h3>
 
-<div id="timer">⏱ Убакыт: 10:00</div>
+<div id="timer">⏱ 10:00</div>
 
 <div id="questionBox"></div>
 
-<button onclick="finish()">Жыйынтык</button> <button class="exit" onclick="home()">Выйти</button>
+<button class="next" onclick="nextQuestion()">Кийинки</button>
 
 <p id="result"></p>
+
 <div id="restartArea"></div>
-
-</div>
-
-<div class="box" id="journal" style="display:none">
-<h3>Мугалим журналы</h3>
-
-<table>
-<thead>
-<tr>
-<th>Окуучу</th>
-<th>Предмет</th>
-<th>Балл</th>
-<th>Баа</th>
-</tr>
-</thead>
-
-<tbody id="table"></tbody>
-
-</table>
-
-<button class="exit" onclick="home()">Выйти</button>
 
 </div>
 
 <script>
 
-let results=[]
 let questions=[]
-let subjectName=""
-let currentKey=""
+let current=0
+let score=0
 
 let time=600
 let timerInterval
 
+function shuffle(arr){
+
+return arr.sort(()=>Math.random()-0.5)
+
+}
+
+function getRandom(arr,count){
+
+let shuffled=shuffle(arr)
+
+return shuffled.slice(0,count)
+
+}
+
 const data={
 
-math:{name:"Математика",q:[
-{q:"5+5=?",a:["8","9","10","11"],c:2},
-{q:"7+3=?",a:["8","9","10","11"],c:2},
-{q:"9-4=?",a:["5","6","7","4"],c:0}
-]},
+math:[
+{q:"5+5=?",a:["8","9","10"],c:2},
+{q:"6+4=?",a:["9","10","11"],c:1},
+{q:"8+2=?",a:["10","9","8"],c:0},
+{q:"7+1=?",a:["8","7","9"],c:0},
+{q:"9-4=?",a:["5","4","6"],c:0},
+{q:"3+3=?",a:["6","5","7"],c:0},
+{q:"10-2=?",a:["7","8","9"],c:1},
+{q:"4+4=?",a:["7","8","9"],c:1},
+{q:"6+3=?",a:["9","10","8"],c:0},
+{q:"2+7=?",a:["8","9","7"],c:1}
+],
 
-ru:{name:"Орус тили",q:[
-{q:"Слово мама канча тамга?",a:["3","4","5","6"],c:1}
-]},
+ru:[
+{q:"Слово мама канча тамга?",a:["3","4","5"],c:1},
+{q:"Дом деген эмне?",a:["үй","шаар","тамак"],c:0},
+{q:"Книга эмне?",a:["китеп","ручка","стол"],c:0},
+{q:"Ручка эмне?",a:["калем","үй","машина"],c:0},
+{q:"Стол эмне?",a:["стол","жер","жыл"],c:0},
+{q:"Школа эмне?",a:["мектеп","тамак","жер"],c:0}
+],
 
-kg:{name:"Кыргыз тили",q:[
-{q:"Кыргыз тили кайсы?",a:["орус","кыргыз","англис","кытай"],c:1}
-]},
+kg:[
+{q:"Кыргыз тили кайсы?",a:["орус","кыргыз","англис"],c:1},
+{q:"Алфавит канча тамга?",a:["36","30","40"],c:0},
+{q:"Кыргызстан эмне?",a:["өлкө","шаар","адам"],c:0},
+{q:"Бишкек эмне?",a:["шаар","адам","китеп"],c:0},
+{q:"Кыргызстандын акчасы?",a:["сом","рубль","доллар"],c:0},
+{q:"Кыргызстандын туусу кандай?",a:["кызыл","көк","жашыл"],c:0}
+],
 
-lit:{name:"Адабий окуу",q:[
-{q:"Китепти ким жазат?",a:["жазуучу","айдоочу","доктур","мугалим"],c:0}
-]},
+lit:[
+{q:"Жомок деген эмне?",a:["окуя","машина","жер"],c:0},
+{q:"Китепти ким жазат?",a:["жазуучу","айдоочу","доктур"],c:0},
+{q:"Поэзия?",a:["ыр","тамак","оюн"],c:0},
+{q:"Автор деген?",a:["жазуучу","доктур","айдоочу"],c:0},
+{q:"Окуу эмне?",a:["билим","тамак","оюн"],c:0}
+],
 
-meken:{name:"Мекен таануу",q:[
-{q:"Кыргызстандын борбору?",a:["Ош","Бишкек","Нарын","Талас"],c:1}
-]}
+meken:[
+{q:"Кыргызстандын борбору?",a:["Ош","Бишкек","Нарын"],c:1},
+{q:"Акча?",a:["сом","рубль","доллар"],c:0},
+{q:"Туу кандай?",a:["кызыл","жашыл","көк"],c:0},
+{q:"Кыргызстан эмне?",a:["өлкө","шаар","китеп"],c:0},
+{q:"Бишкек кайда?",a:["Кыргызстан","Россия","Кытай"],c:0}
+]
 
-}
-
-function home(){
-
-start.style.display="block"
-teacherLogin.style.display="none"
-studentLogin.style.display="none"
-subjects.style.display="none"
-test.style.display="none"
-journal.style.display="none"
-
-clearInterval(timerInterval)
-
-}
-
-function openTeacher(){
-start.style.display="none"
-teacherLogin.style.display="block"
 }
 
 function openStudent(){
+
 start.style.display="none"
 studentLogin.style.display="block"
-}
 
-function enterTeacher(){
-teacherLogin.style.display="none"
-journal.style.display="block"
-updateJournal()
 }
 
 function enterStudent(){
+
 studentLogin.style.display="none"
 subjects.style.display="block"
+
 }
 
 function startTimer(){
@@ -267,12 +226,12 @@ let s=time%60
 
 if(s<10)s="0"+s
 
-timer.innerText="⏱ Убакыт: "+m+":"+s
+timer.innerText="⏱ "+m+":"+s
 
 if(time<=0){
 
 clearInterval(timerInterval)
-alert("Убакыт бүттү")
+
 finish()
 
 }
@@ -283,37 +242,63 @@ finish()
 
 function startTest(key){
 
-currentKey=key
+questions=getRandom(data[key],5)
 
-let d=data[key]
-
-subjectName=d.name
-questions=d.q
+current=0
+score=0
 
 subjects.style.display="none"
 test.style.display="block"
 
-subjectTitle.innerText=d.name
+subjectTitle.innerText=key
 
 startTimer()
 
-let html=""
+showQuestion()
 
-questions.forEach((q,i)=>{
+}
 
-html+="<div class='q'>"+(i+1)+") "+q.q+"<br>"
+function showQuestion(){
 
-q.a.forEach((o,j)=>{
+let q=questions[current]
 
-html+="<label><input type='radio' name='q"+i+"' value='"+j+"'> "+o+"</label><br>"
+let html="<div class='q'><b>"+(current+1)+") "+q.q+"</b><br>"
 
+q.a.forEach((o,i)=>{
+html+="<label><input type='radio' name='a' value='"+i+"'> "+o+"</label>"
 })
 
 html+="</div>"
 
-})
-
 questionBox.innerHTML=html
+
+}
+
+function nextQuestion(){
+
+let ans=document.querySelector("input[name='a']:checked")
+
+if(ans){
+
+if(parseInt(ans.value)==questions[current].c){
+
+score++
+
+}
+
+}
+
+current++
+
+if(current<questions.length){
+
+showQuestion()
+
+}else{
+
+finish()
+
+}
 
 }
 
@@ -321,61 +306,23 @@ function finish(){
 
 clearInterval(timerInterval)
 
-let score=0
-
-questions.forEach((q,i)=>{
-
-let a=document.querySelector("input[name='q"+i+"']:checked")
-
-if(a && parseInt(a.value)==q.c){
-score++
-}
-
-})
-
 let grade=2
 
-if(score>=3)grade=5
-else if(score==2)grade=4
-else if(score==1)grade=3
+if(score==5)grade=5
+else if(score>=3)grade=4
+else if(score>=2)grade=3
 
 let msg="Балл: "+score+" | Баа: "+grade
 
 if(grade==2){
-msg+=" 😅 Сен двойичниксинбы?"
+
+msg+=" 😅 Сен двойичниксинби?"
+
 }
 
 result.innerText=msg
 
-restartArea.innerHTML="<button class='restart' onclick='startTest(currentKey)'>🔄 Кайра баштоо</button>"
-
-results.push({
-name:sname.value,
-subject:subjectName,
-score:score,
-grade:grade
-})
-
-updateJournal()
-
-}
-
-function updateJournal(){
-
-table.innerHTML=""
-
-results.forEach(r=>{
-
-table.innerHTML+=`
-<tr>
-<td>${r.name}</td>
-<td>${r.subject}</td>
-<td>${r.score}</td>
-<td>${r.grade}</td>
-</tr>
-`
-
-})
+restartArea.innerHTML="<button class='restart' onclick='location.reload()'>🔄 Кайра баштоо</button>"
 
 }
 
