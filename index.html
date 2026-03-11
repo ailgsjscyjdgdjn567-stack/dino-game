@@ -11,7 +11,7 @@
 body{
 font-family:Arial;
 margin:0;
-background:linear-gradient(135deg,#4f6cff,#7b8cff,#a7b3ff);
+background:linear-gradient(135deg,#5c6cff,#8a96ff);
 text-align:center;
 }
 
@@ -24,56 +24,70 @@ font-size:22px;
 
 .box{
 background:white;
-width:95%;
-max-width:520px;
+width:92%;
+max-width:500px;
 margin:20px auto;
 padding:20px;
-border-radius:14px;
-box-shadow:0 10px 25px rgba(0,0,0,0.2);
+border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.2);
 }
 
 button{
 width:100%;
-padding:14px;
+padding:12px;
 margin-top:10px;
-font-size:18px;
+font-size:17px;
 border:none;
-border-radius:10px;
+border-radius:8px;
 background:#4f6cff;
 color:white;
 }
 
-.exit{background:#ff4444}
-.next{background:#00a86b}
+.exit{
+background:#ff4c4c;
+}
+
+.next{
+background:#00a86b;
+}
 
 input,textarea{
 width:90%;
 padding:10px;
 margin-top:6px;
+font-size:16px;
+}
+
+label{
+display:block;
+background:#f2f2f2;
+padding:10px;
+margin-top:6px;
+border-radius:8px;
 }
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:10px;
 }
 
 th,td{
 border:1px solid #ccc;
-padding:8px;
+padding:6px;
+font-size:14px;
 }
 
 .chat{
 height:150px;
 overflow:auto;
 border:1px solid #ccc;
-padding:6px;
+padding:8px;
 text-align:left;
 }
 
 .avatar{
-width:50px;
-height:50px;
+width:45px;
+height:45px;
 border-radius:50%;
 object-fit:cover;
 }
@@ -90,40 +104,40 @@ object-fit:cover;
 
 <h3>Ким кирет?</h3>
 
-<button onclick="studentRegister()">👦 Окуучу</button> <button onclick="teacherLogin()">👨‍🏫 Мугалим</button>
+<button onclick="openStudentRegister()">👦 Окуучу</button> <button onclick="openTeacherLogin()">👨‍🏫 Мугалим</button>
 
 </div>
 
 <div class="box" id="studentRegister" style="display:none">
 
-<h3>Окуучу аккаунт</h3>
+<h3>Окуучу каттоо</h3>
 
-<input id="studentName" placeholder="ФИО">
-<input id="studentPass" type="password" placeholder="Пароль">
-<input type="file" id="avatarInput">
+<input id="regName" placeholder="ФИО">
+<input id="regPass" type="password" placeholder="Пароль">
 
-<button onclick="saveStudent()">Сактоо</button>
+<button onclick="registerStudent()">Катталуу</button> <button class="exit" onclick="reload()">Артка</button>
 
 </div>
 
 <div class="box" id="studentLogin" style="display:none">
 
-<h3>Кирүү</h3>
+<h3>Окуучу кирүү</h3>
 
 <input id="loginName" placeholder="ФИО">
 <input id="loginPass" type="password" placeholder="Пароль">
 
-<button onclick="enterStudent()">Кирүү</button>
+<button onclick="loginStudent()">Кирүү</button> <button onclick="showRegister()">Катталуу</button>
 
 </div>
 
-<div class="box" id="teacherLoginBox" style="display:none">
+<div class="box" id="teacherLogin" style="display:none">
 
-<h3>Мугалим пароль</h3>
+<h3>Мугалим кирүү</h3>
 
-<input type="password" id="teacherPass">
+<input id="teacherName" placeholder="Мугалим аты">
+<input id="teacherPass" type="password" placeholder="Пароль">
 
-<button onclick="enterTeacher()">Кирүү</button>
+<button onclick="loginTeacher()">Кирүү</button> <button class="exit" onclick="reload()">Артка</button>
 
 </div>
 
@@ -131,9 +145,9 @@ object-fit:cover;
 
 <h3>Предмет тандоо</h3>
 
-<button onclick="startTest('Математика')">➕ Математика</button> <button onclick="startTest('Кыргыз тили')">🇰🇬 Кыргыз тили</button>
+<button onclick="startTest('Математика')">➕ Математика</button> <button onclick="startTest('Кыргыз тили')">📖 Кыргыз тили</button> <button onclick="startTest('Орус тили')">🇷🇺 Орус тили</button>
 
-<button class="exit" onclick="logout()">Чыгуу</button>
+<button class="exit" onclick="reload()">Чыгуу</button>
 
 </div>
 
@@ -159,21 +173,18 @@ object-fit:cover;
 
 <table>
 
-<thead>
 <tr>
-<th>Аватар</th>
 <th>Окуучу</th>
 <th>Предмет</th>
 <th>Баа</th>
 <th>Комментарий</th>
 </tr>
-</thead>
 
 <tbody id="journal"></tbody>
 
 </table>
 
-<h3>💬 Мугалим чат</h3>
+<h3>💬 Чат</h3>
 
 <div class="chat" id="chatBox"></div>
 
@@ -181,7 +192,7 @@ object-fit:cover;
 
 <button onclick="sendMessage()">Жөнөтүү</button>
 
-<button class="exit" onclick="logout()">Чыгуу</button>
+<button class="exit" onclick="reload()">Чыгуу</button>
 
 </div>
 
@@ -192,7 +203,6 @@ let journal=JSON.parse(localStorage.getItem("journal")||"[]")
 let chat=JSON.parse(localStorage.getItem("chat")||"[]")
 
 let currentStudent=""
-let avatar=""
 let subject=""
 let questions=[]
 let current=0
@@ -203,55 +213,45 @@ const questionBank=[
 {q:"6+4=?",a:["9","10","11"],c:1},
 {q:"7+1=?",a:["8","9","7"],c:0},
 {q:"9-4=?",a:["5","6","4"],c:0},
-{q:"3+3=?",a:["6","7","5"],c:0}
+{q:"3+3=?",a:["6","7","5"],c:0},
+{q:"10-2=?",a:["7","8","9"],c:1}
 ]
 
 function shuffle(arr){
 return arr.sort(()=>Math.random()-0.5)
 }
 
-function studentRegister(){
-role.style.display="none"
-studentRegister.style.display="block"
+function openStudentRegister(){
+document.getElementById("role").style.display="none"
+document.getElementById("studentRegister").style.display="block"
 }
 
-function teacherLogin(){
-role.style.display="none"
-teacherLoginBox.style.display="block"
+function openTeacherLogin(){
+document.getElementById("role").style.display="none"
+document.getElementById("teacherLogin").style.display="block"
 }
 
-function saveStudent(){
+function showRegister(){
+document.getElementById("studentLogin").style.display="none"
+document.getElementById("studentRegister").style.display="block"
+}
 
-let name=document.getElementById("studentName").value
-let pass=document.getElementById("studentPass").value
+function registerStudent(){
 
-let file=document.getElementById("avatarInput").files[0]
+let name=document.getElementById("regName").value
+let pass=document.getElementById("regPass").value
 
-if(file){
-
-let reader=new FileReader()
-
-reader.onload=function(e){
-
-avatar=e.target.result
-
-students.push({name:name,pass:pass,avatar:avatar})
+students.push({name:name,pass:pass})
 
 localStorage.setItem("students",JSON.stringify(students))
 
-alert("Аккаунт түзүлдү")
+alert("Катталды!")
 
-location.reload()
-
-}
-
-reader.readAsDataURL(file)
+reload()
 
 }
 
-}
-
-function enterStudent(){
+function loginStudent(){
 
 let name=document.getElementById("loginName").value
 let pass=document.getElementById("loginPass").value
@@ -261,23 +261,20 @@ let found=students.find(s=>s.name==name && s.pass==pass)
 if(found){
 
 currentStudent=name
-avatar=found.avatar
 
-studentLogin.style.display="none"
-subjects.style.display="block"
+document.getElementById("studentLogin").style.display="none"
+document.getElementById("subjects").style.display="block"
 
 }else{
-
 alert("Кирүү туура эмес")
-
 }
 
 }
 
-function enterTeacher(){
+function loginTeacher(){
 
-teacherLoginBox.style.display="none"
-teacherPanel.style.display="block"
+document.getElementById("teacherLogin").style.display="none"
+document.getElementById("teacherPanel").style.display="block"
 
 updateJournal()
 updateChat()
@@ -287,13 +284,12 @@ updateChat()
 function startTest(sub){
 
 subject=sub
-
 questions=shuffle([...questionBank]).slice(0,3)
 
-subjects.style.display="none"
-test.style.display="block"
+document.getElementById("subjects").style.display="none"
+document.getElementById("test").style.display="block"
 
-subjectTitle.innerText=sub
+document.getElementById("subjectTitle").innerText=sub
 
 current=0
 score=0
@@ -306,13 +302,13 @@ function showQuestion(){
 
 let q=questions[current]
 
-let html="<b>"+(current+1)+". "+q.q+"</b><br>"
+let html="<b>"+(current+1)+". "+q.q+"</b>"
 
 q.a.forEach((o,i)=>{
 html+="<label><input type='radio' name='a' value='"+i+"'> "+o+"</label>"
 })
 
-questionBox.innerHTML=html
+document.getElementById("questionBox").innerHTML=html
 
 }
 
@@ -344,7 +340,7 @@ if(score==3)grade=5
 else if(score==2)grade=4
 else if(score==1)grade=3
 
-result.innerText="Баа: "+grade
+document.getElementById("result").innerText="Баа: "+grade
 
 score=grade
 
@@ -356,7 +352,6 @@ let comment=document.getElementById("comment").value
 
 journal.push({
 name:currentStudent,
-avatar:avatar,
 subject:subject,
 grade:score,
 comment:comment
@@ -364,9 +359,9 @@ comment:comment
 
 localStorage.setItem("journal",JSON.stringify(journal))
 
-alert("Жиберилди")
+alert("Сакталды")
 
-location.reload()
+reload()
 
 }
 
@@ -374,18 +369,13 @@ function updateJournal(){
 
 let html=""
 
-journal.forEach(s=>{
-
-html+=`
-<tr>
-<td><img src="${s.avatar}" class="avatar"></td>
-<td>${s.name}</td>
-<td>${s.subject}</td>
-<td>${s.grade}</td>
-<td>${s.comment}</td>
-</tr>
-`
-
+journal.forEach(j=>{
+html+=`<tr>
+<td>${j.name}</td>
+<td>${j.subject}</td>
+<td>${j.grade}</td>
+<td>${j.comment}</td>
+</tr>`
 })
 
 document.getElementById("journal").innerHTML=html
@@ -396,7 +386,7 @@ function sendMessage(){
 
 let msg=document.getElementById("chatInput").value
 
-chat.push("👨‍🏫: "+msg)
+chat.push("👨‍🏫 "+msg)
 
 localStorage.setItem("chat",JSON.stringify(chat))
 
@@ -412,11 +402,11 @@ chat.forEach(m=>{
 html+=m+"<br>"
 })
 
-chatBox.innerHTML=html
+document.getElementById("chatBox").innerHTML=html
 
 }
 
-function logout(){
+function reload(){
 location.reload()
 }
 
