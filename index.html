@@ -4,19 +4,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Онлайн мектеп</title>
+<title>Электрондук мектеп</title>
 
 <style>
 
 body{
 font-family:Arial;
 margin:0;
-background:linear-gradient(135deg,#6a5cff,#8f7bff,#b3a8ff);
+background:linear-gradient(135deg,#4f6cff,#7b8cff,#a7b3ff);
 text-align:center;
 }
 
 header{
-background:#4f46ff;
+background:#2f3cff;
 color:white;
 padding:15px;
 font-size:22px;
@@ -34,45 +34,48 @@ box-shadow:0 10px 25px rgba(0,0,0,0.2);
 
 button{
 width:100%;
-padding:16px;
+padding:14px;
 margin-top:10px;
 font-size:18px;
-background:#5a54ff;
-color:white;
 border:none;
 border-radius:10px;
+background:#4f6cff;
+color:white;
 }
 
-.next{
-background:#00a86b;
+.exit{background:#ff4444}
+.next{background:#00a86b}
+
+input,textarea{
+width:90%;
+padding:10px;
+margin-top:6px;
 }
 
-.restart{
-background:#ff8c00;
-}
-
-.q{
-text-align:left;
-font-size:18px;
+table{
+width:100%;
+border-collapse:collapse;
 margin-top:10px;
 }
 
-label{
-display:block;
-padding:10px;
-background:#f3f3f3;
-margin-top:6px;
-border-radius:8px;
+th,td{
+border:1px solid #ccc;
+padding:8px;
 }
 
-input[type="radio"]{
-margin-right:10px;
+.chat{
+height:150px;
+overflow:auto;
+border:1px solid #ccc;
+padding:6px;
+text-align:left;
 }
 
-#timer{
-font-size:20px;
-color:red;
-margin-bottom:10px;
+.avatar{
+width:50px;
+height:50px;
+border-radius:50%;
+object-fit:cover;
 }
 
 </style>
@@ -81,23 +84,46 @@ margin-bottom:10px;
 
 <body>
 
-<header>📚 Онлайн мектеп</header>
+<header>🏫 Электрондук мектеп</header>
 
-<div class="box" id="start">
+<div class="box" id="role">
 
 <h3>Ким кирет?</h3>
 
-<button onclick="openStudent()">👦 Окуучу</button>
+<button onclick="studentRegister()">👦 Окуучу</button> <button onclick="teacherLogin()">👨‍🏫 Мугалим</button>
+
+</div>
+
+<div class="box" id="studentRegister" style="display:none">
+
+<h3>Окуучу аккаунт</h3>
+
+<input id="studentName" placeholder="ФИО">
+<input id="studentPass" type="password" placeholder="Пароль">
+<input type="file" id="avatarInput">
+
+<button onclick="saveStudent()">Сактоо</button>
 
 </div>
 
 <div class="box" id="studentLogin" style="display:none">
 
-<h3>Окуучу</h3>
+<h3>Кирүү</h3>
 
-<input id="sname" placeholder="ФИО" style="width:90%;padding:12px;font-size:16px">
+<input id="loginName" placeholder="ФИО">
+<input id="loginPass" type="password" placeholder="Пароль">
 
-<button onclick="enterStudent()">Баштоо</button>
+<button onclick="enterStudent()">Кирүү</button>
+
+</div>
+
+<div class="box" id="teacherLoginBox" style="display:none">
+
+<h3>Мугалим пароль</h3>
+
+<input type="password" id="teacherPass">
+
+<button onclick="enterTeacher()">Кирүү</button>
 
 </div>
 
@@ -105,7 +131,9 @@ margin-bottom:10px;
 
 <h3>Предмет тандоо</h3>
 
-<button onclick="startTest('math')">➕ Математика</button> <button onclick="startTest('ru')">🇷🇺 Орус тили</button> <button onclick="startTest('kg')">🇰🇬 Кыргыз тили</button> <button onclick="startTest('lit')">📖 Адабий окуу</button> <button onclick="startTest('meken')">🌍 Мекен таануу</button>
+<button onclick="startTest('Математика')">➕ Математика</button> <button onclick="startTest('Кыргыз тили')">🇰🇬 Кыргыз тили</button>
+
+<button class="exit" onclick="logout()">Чыгуу</button>
 
 </div>
 
@@ -113,146 +141,162 @@ margin-bottom:10px;
 
 <h3 id="subjectTitle"></h3>
 
-<div id="timer">⏱ 10:00</div>
-
 <div id="questionBox"></div>
 
 <button class="next" onclick="nextQuestion()">Кийинки</button>
 
 <p id="result"></p>
 
-<div id="restartArea"></div>
+<textarea id="comment" placeholder="Комментарий"></textarea>
+
+<button onclick="saveResult()">Жиберүү</button>
+
+</div>
+
+<div class="box" id="teacherPanel" style="display:none">
+
+<h3>📊 Журнал</h3>
+
+<table>
+
+<thead>
+<tr>
+<th>Аватар</th>
+<th>Окуучу</th>
+<th>Предмет</th>
+<th>Баа</th>
+<th>Комментарий</th>
+</tr>
+</thead>
+
+<tbody id="journal"></tbody>
+
+</table>
+
+<h3>💬 Мугалим чат</h3>
+
+<div class="chat" id="chatBox"></div>
+
+<input id="chatInput" placeholder="Билдирүү">
+
+<button onclick="sendMessage()">Жөнөтүү</button>
+
+<button class="exit" onclick="logout()">Чыгуу</button>
 
 </div>
 
 <script>
 
+let students=JSON.parse(localStorage.getItem("students")||"[]")
+let journal=JSON.parse(localStorage.getItem("journal")||"[]")
+let chat=JSON.parse(localStorage.getItem("chat")||"[]")
+
+let currentStudent=""
+let avatar=""
+let subject=""
 let questions=[]
 let current=0
 let score=0
 
-let time=600
-let timerInterval
-
-function shuffle(arr){
-
-return arr.sort(()=>Math.random()-0.5)
-
-}
-
-function getRandom(arr,count){
-
-let shuffled=shuffle(arr)
-
-return shuffled.slice(0,count)
-
-}
-
-const data={
-
-math:[
+const questionBank=[
 {q:"5+5=?",a:["8","9","10"],c:2},
 {q:"6+4=?",a:["9","10","11"],c:1},
-{q:"8+2=?",a:["10","9","8"],c:0},
-{q:"7+1=?",a:["8","7","9"],c:0},
-{q:"9-4=?",a:["5","4","6"],c:0},
-{q:"3+3=?",a:["6","5","7"],c:0},
-{q:"10-2=?",a:["7","8","9"],c:1},
-{q:"4+4=?",a:["7","8","9"],c:1},
-{q:"6+3=?",a:["9","10","8"],c:0},
-{q:"2+7=?",a:["8","9","7"],c:1}
-],
-
-ru:[
-{q:"Слово мама канча тамга?",a:["3","4","5"],c:1},
-{q:"Дом деген эмне?",a:["үй","шаар","тамак"],c:0},
-{q:"Книга эмне?",a:["китеп","ручка","стол"],c:0},
-{q:"Ручка эмне?",a:["калем","үй","машина"],c:0},
-{q:"Стол эмне?",a:["стол","жер","жыл"],c:0},
-{q:"Школа эмне?",a:["мектеп","тамак","жер"],c:0}
-],
-
-kg:[
-{q:"Кыргыз тили кайсы?",a:["орус","кыргыз","англис"],c:1},
-{q:"Алфавит канча тамга?",a:["36","30","40"],c:0},
-{q:"Кыргызстан эмне?",a:["өлкө","шаар","адам"],c:0},
-{q:"Бишкек эмне?",a:["шаар","адам","китеп"],c:0},
-{q:"Кыргызстандын акчасы?",a:["сом","рубль","доллар"],c:0},
-{q:"Кыргызстандын туусу кандай?",a:["кызыл","көк","жашыл"],c:0}
-],
-
-lit:[
-{q:"Жомок деген эмне?",a:["окуя","машина","жер"],c:0},
-{q:"Китепти ким жазат?",a:["жазуучу","айдоочу","доктур"],c:0},
-{q:"Поэзия?",a:["ыр","тамак","оюн"],c:0},
-{q:"Автор деген?",a:["жазуучу","доктур","айдоочу"],c:0},
-{q:"Окуу эмне?",a:["билим","тамак","оюн"],c:0}
-],
-
-meken:[
-{q:"Кыргызстандын борбору?",a:["Ош","Бишкек","Нарын"],c:1},
-{q:"Акча?",a:["сом","рубль","доллар"],c:0},
-{q:"Туу кандай?",a:["кызыл","жашыл","көк"],c:0},
-{q:"Кыргызстан эмне?",a:["өлкө","шаар","китеп"],c:0},
-{q:"Бишкек кайда?",a:["Кыргызстан","Россия","Кытай"],c:0}
+{q:"7+1=?",a:["8","9","7"],c:0},
+{q:"9-4=?",a:["5","6","4"],c:0},
+{q:"3+3=?",a:["6","7","5"],c:0}
 ]
+
+function shuffle(arr){
+return arr.sort(()=>Math.random()-0.5)
+}
+
+function studentRegister(){
+role.style.display="none"
+studentRegister.style.display="block"
+}
+
+function teacherLogin(){
+role.style.display="none"
+teacherLoginBox.style.display="block"
+}
+
+function saveStudent(){
+
+let name=document.getElementById("studentName").value
+let pass=document.getElementById("studentPass").value
+
+let file=document.getElementById("avatarInput").files[0]
+
+if(file){
+
+let reader=new FileReader()
+
+reader.onload=function(e){
+
+avatar=e.target.result
+
+students.push({name:name,pass:pass,avatar:avatar})
+
+localStorage.setItem("students",JSON.stringify(students))
+
+alert("Аккаунт түзүлдү")
+
+location.reload()
 
 }
 
-function openStudent(){
+reader.readAsDataURL(file)
 
-start.style.display="none"
-studentLogin.style.display="block"
+}
 
 }
 
 function enterStudent(){
 
+let name=document.getElementById("loginName").value
+let pass=document.getElementById("loginPass").value
+
+let found=students.find(s=>s.name==name && s.pass==pass)
+
+if(found){
+
+currentStudent=name
+avatar=found.avatar
+
 studentLogin.style.display="none"
 subjects.style.display="block"
 
-}
+}else{
 
-function startTimer(){
-
-time=600
-
-timerInterval=setInterval(()=>{
-
-time--
-
-let m=Math.floor(time/60)
-let s=time%60
-
-if(s<10)s="0"+s
-
-timer.innerText="⏱ "+m+":"+s
-
-if(time<=0){
-
-clearInterval(timerInterval)
-
-finish()
+alert("Кирүү туура эмес")
 
 }
 
-},1000)
+}
+
+function enterTeacher(){
+
+teacherLoginBox.style.display="none"
+teacherPanel.style.display="block"
+
+updateJournal()
+updateChat()
 
 }
 
-function startTest(key){
+function startTest(sub){
 
-questions=getRandom(data[key],5)
+subject=sub
 
-current=0
-score=0
+questions=shuffle([...questionBank]).slice(0,3)
 
 subjects.style.display="none"
 test.style.display="block"
 
-subjectTitle.innerText=key
+subjectTitle.innerText=sub
 
-startTimer()
+current=0
+score=0
 
 showQuestion()
 
@@ -262,13 +306,11 @@ function showQuestion(){
 
 let q=questions[current]
 
-let html="<div class='q'><b>"+(current+1)+") "+q.q+"</b><br>"
+let html="<b>"+(current+1)+". "+q.q+"</b><br>"
 
 q.a.forEach((o,i)=>{
 html+="<label><input type='radio' name='a' value='"+i+"'> "+o+"</label>"
 })
-
-html+="</div>"
 
 questionBox.innerHTML=html
 
@@ -279,51 +321,103 @@ function nextQuestion(){
 let ans=document.querySelector("input[name='a']:checked")
 
 if(ans){
-
 if(parseInt(ans.value)==questions[current].c){
-
 score++
-
 }
-
 }
 
 current++
 
 if(current<questions.length){
-
 showQuestion()
-
 }else{
-
 finish()
-
 }
 
 }
 
 function finish(){
 
-clearInterval(timerInterval)
-
 let grade=2
 
-if(score==5)grade=5
-else if(score>=3)grade=4
-else if(score>=2)grade=3
+if(score==3)grade=5
+else if(score==2)grade=4
+else if(score==1)grade=3
 
-let msg="Балл: "+score+" | Баа: "+grade
+result.innerText="Баа: "+grade
 
-if(grade==2){
-
-msg+=" 😅 Сен двойичниксинби?"
+score=grade
 
 }
 
-result.innerText=msg
+function saveResult(){
 
-restartArea.innerHTML="<button class='restart' onclick='location.reload()'>🔄 Кайра баштоо</button>"
+let comment=document.getElementById("comment").value
 
+journal.push({
+name:currentStudent,
+avatar:avatar,
+subject:subject,
+grade:score,
+comment:comment
+})
+
+localStorage.setItem("journal",JSON.stringify(journal))
+
+alert("Жиберилди")
+
+location.reload()
+
+}
+
+function updateJournal(){
+
+let html=""
+
+journal.forEach(s=>{
+
+html+=`
+<tr>
+<td><img src="${s.avatar}" class="avatar"></td>
+<td>${s.name}</td>
+<td>${s.subject}</td>
+<td>${s.grade}</td>
+<td>${s.comment}</td>
+</tr>
+`
+
+})
+
+document.getElementById("journal").innerHTML=html
+
+}
+
+function sendMessage(){
+
+let msg=document.getElementById("chatInput").value
+
+chat.push("👨‍🏫: "+msg)
+
+localStorage.setItem("chat",JSON.stringify(chat))
+
+updateChat()
+
+}
+
+function updateChat(){
+
+let html=""
+
+chat.forEach(m=>{
+html+=m+"<br>"
+})
+
+chatBox.innerHTML=html
+
+}
+
+function logout(){
+location.reload()
 }
 
 </script>
